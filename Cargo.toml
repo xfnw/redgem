@@ -5,3 +5,5 @@ license = "AGPL-3.0-or-later"
 edition = "2024"
 
 [dependencies]
+ada-url = "=3.2.3"
+foxerror = "0.1.1"
