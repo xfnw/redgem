@@ -1,8 +1,7 @@
 use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf};
 
-mod request;
-mod response;
+mod server;
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -22,18 +21,6 @@ struct Opt {
     /// defaults to looking in the same file as your certificate,
     /// allowing both to be in one file
     key: Option<PathBuf>,
-}
-
-#[derive(Debug, Eq, PartialEq, foxerror::FoxError)]
-enum Error {
-    HeaderTooLong,
-    BadLineEndings,
-    #[err(from)]
-    NonUtf8(std::string::FromUtf8Error),
-    #[err(from)]
-    UnparseableUrl(ada_url::ParseUrlError<String>),
-    NonGeminiScheme,
-    Userinfo,
 }
 
 fn main() {

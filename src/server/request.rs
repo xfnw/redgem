@@ -1,4 +1,4 @@
-use crate::Error;
+use super::Error;
 use ada_url::Url;
 
 #[derive(Debug)]
