@@ -34,6 +34,7 @@ struct Opt {
 #[tokio::main]
 async fn main() {
     let opt = Opt::parse();
+    let srv = Arc::new(server::Server::new());
     let cert = CertificateDer::pem_file_iter(&opt.cert)
         .expect("could not open certificate")
         .collect::<Result<Vec<_>, _>>()
@@ -52,13 +53,14 @@ async fn main() {
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
         let acceptor = acceptor.clone();
+        let srv = srv.clone();
 
         tokio::spawn(async move {
             let Ok(mut stream) = acceptor.accept(sock).await else {
                 return;
             };
 
-            _ = stream.write_all(b"hewwo world").await;
+            srv.handle_connection(&mut stream).await;
 
             _ = stream.shutdown().await;
         });
