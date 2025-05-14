@@ -94,11 +94,11 @@ impl Server {
             return response::Response::not_found();
         };
         let Ok(mut entry) = self.zip.reader_with_entry(*index).await else {
-            return todo!();
+            return response::Response::entry_fail();
         };
         let mut out = Vec::new();
         if entry.read_to_end_checked(&mut out).await.is_err() {
-            return todo!();
+            return response::Response::entry_corrupted();
         }
         let mimetype = response::MimeType::from_extension(path.extension(), None);
         response::Response::with_type(mimetype, out)

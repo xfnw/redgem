@@ -59,6 +59,22 @@ impl MimeType {
 
 #[derive(Debug)]
 #[non_exhaustive]
+pub enum TempKind {
+    BadEntry,
+    Corrupted,
+}
+
+impl TempKind {
+    fn bytes_append(&self, target: &mut Vec<u8>) {
+        target.extend_from_slice(match self {
+            Self::BadEntry => b"40 failed to open zip entry",
+            Self::Corrupted => b"40 zip entry corrupted",
+        });
+    }
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
 pub enum PermKind {
     NotFound,
     BadRequest,
@@ -77,6 +93,7 @@ impl PermKind {
 #[non_exhaustive]
 pub enum Response {
     Success { mimetype: MimeType, body: Vec<u8> },
+    TempFail { kind: TempKind },
     PermFail { kind: PermKind },
 }
 
@@ -97,6 +114,18 @@ impl Response {
         }
     }
 
+    pub fn entry_fail() -> Self {
+        Self::TempFail {
+            kind: TempKind::BadEntry,
+        }
+    }
+
+    pub fn entry_corrupted() -> Self {
+        Self::TempFail {
+            kind: TempKind::Corrupted,
+        }
+    }
+
     pub fn into_bytes(self) -> Vec<u8> {
         let mut out = Vec::new();
 
@@ -106,6 +135,10 @@ impl Response {
                 mimetype.bytes_append(&mut out);
                 out.extend_from_slice(b"\r\n");
                 out.append(&mut body);
+            }
+            Self::TempFail { kind } => {
+                kind.bytes_append(&mut out);
+                out.extend_from_slice(b"\r\n");
             }
             Self::PermFail { kind } => {
                 kind.bytes_append(&mut out);
