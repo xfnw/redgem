@@ -10,4 +10,4 @@ async_zip = { version = "0.0.17", features = ["tokio", "tokio-fs"] }
 clap = { version = "4.5.38", default-features = false, features = ["derive", "std", "help", "usage"] }
 foxerror = "0.1.1"
 tokio = { version = "1.45.0", features = ["rt-multi-thread", "net", "macros", "io-util", "fs"] }
-tokio-rustls = { version = "0.26.2", default-features = false, features = ["tls12", "aws_lc_rs"] }
+tokio-rustls = { version = "0.26.2", default-features = false, features = ["tls12", "ring"] }
