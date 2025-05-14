@@ -1,7 +1,7 @@
 # redgem
 a zipapp gemini server
 
-## using
+## building
 redgem can be built with cargo
 ```
 cargo build -r
@@ -17,6 +17,7 @@ chmod +x redgem.zip
 zip -A redgem.zip
 ```
 
+## usage
 to run it you'll need a tls certificate, a simple self-signed one can
 be created with with openssl
 ```
@@ -32,3 +33,19 @@ you can modify the contents later like any other zip file, but try not
 to do that while redgem is running. the zip library it uses re-opens the
 zip file when reading for concurrency reasons, and it'll get confused
 if the contents are different
+
+## upgrading
+redgem can be removed from a zip file with `zip -J`. the resulting zip
+can then be re-concatenated with a new version of redgem like in the
+build instructions
+
+## gempub
+while redgem does not have any specific [gempub] support, the format
+is simple enough that it can mostly serve the contents of a gempub.
+this means you can make a gemini server gempub polygot!
+
+however, note that redgem lacks encoding detection for gemtext, and
+just serves everything as UTF-8. this will be incorrect for gempub
+files that have an encoding other than UTF-8 specified
+
+[gempub]: https://codeberg.org/oppenlab/gempub
