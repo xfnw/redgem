@@ -41,7 +41,9 @@ struct Opt {
 #[tokio::main]
 async fn main() {
     let opt: Opt = argh::from_env();
-    let zip = ZipFileReader::new(&opt.zip).await.unwrap();
+    let zip = ZipFileReader::new(&opt.zip)
+        .await
+        .expect("failed to open zip");
     let srv = Arc::new(server::Server::from_zip(zip));
     let cert = CertificateDer::pem_file_iter(&opt.cert)
         .expect("could not open certificate")
