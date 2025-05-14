@@ -1,7 +1,7 @@
 #![deny(clippy::pedantic)]
 
+use argh::FromArgs;
 use async_zip::tokio::read::fs::ZipFileReader;
-use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tokio_rustls::{
@@ -14,29 +14,33 @@ use tokio_rustls::{
 
 mod server;
 
-#[derive(Debug, Parser)]
+/// a zipapp gemini server
+#[derive(Debug, FromArgs)]
+#[argh(help_triggers("--help"))]
 struct Opt {
     /// address to listen on
-    #[arg(long, default_value = "[::]:1965")]
+    #[argh(option, default = "\"[::]:1965\".parse().unwrap()")]
     bind: SocketAddr,
-    /// zip file to serve files from
+    /// zip file to serve files from.
     ///
-    /// defaults to the current binary, serving files from a zip file
-    /// concatenated with itself
-    #[arg(long, default_value = "/proc/self/exe")]
+    /// defaults to the current binary in procfs, serving files from a
+    /// zip file concatenated with itself
+    #[argh(option, default = "\"/proc/self/exe\".parse().unwrap()")]
     zip: PathBuf,
     /// path to your tls certificate
+    #[argh(positional)]
     cert: PathBuf,
-    /// path to your tls private key
+    /// path to your tls private key.
     ///
     /// defaults to looking in the same file as your certificate,
     /// allowing both to be in one file
+    #[argh(positional)]
     key: Option<PathBuf>,
 }
 
 #[tokio::main]
 async fn main() {
-    let opt = Opt::parse();
+    let opt: Opt = argh::from_env();
     let zip = ZipFileReader::new(&opt.zip).await.unwrap();
     let srv = Arc::new(server::Server::from_zip(zip));
     let cert = CertificateDer::pem_file_iter(&opt.cert)
