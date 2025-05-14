@@ -2,5 +2,7 @@
 /result
 *.data
 *.old
+*.pem
 *.profraw
 *.svg
+*.zip
