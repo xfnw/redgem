@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 #[derive(Debug)]
 pub struct MimeType {
     domtype: &'static str,
@@ -6,34 +8,34 @@ pub struct MimeType {
 }
 
 impl MimeType {
-    pub fn from_extension(ext: &str, charset: Option<String>) -> Self {
-        let (domtype, subtype) = match ext {
-            "c" | "rs" => ("text", "x-c"),
-            "css" => ("text", "css"),
-            "gif" => ("image", "gif"),
-            "gmi" => ("text", "gemini"),
-            "html" | "htm" => ("text", "html"),
-            "jpeg" | "jpg" => ("image", "jpeg"),
-            "js" => ("application", "x-javascript"),
-            "json" => ("application", "json"),
-            "m3u" => ("audio", "x-mpegurl"),
-            "mp3" => ("audio", "mpeg"),
-            "mp4" => ("video", "mp4"),
-            "ogg" => ("application", "ogg"),
-            "png" => ("image", "png"),
-            "py" => ("text", "x-script.python"),
-            "sh" => ("text", "x-shellscript"),
-            "svg" => ("image", "svg+xml"),
-            "torrent" => ("application", "x-bittorrent"),
-            "txt" | "tal" | "vf" => ("text", "plain"),
-            "wasm" => ("application", "wasm"),
-            "wav" => ("audio", "x-wav"),
-            "webm" => ("video", "webm"),
-            "webp" => ("image", "webp"),
-            "xml" | "xsl" => ("text", "xml"),
-            "zip" => ("application", "zip"),
-            "zstd" | "zst" => ("application", "zstd"),
-            _ => ("application", "octet-stream"),
+    pub fn from_extension(ext: Option<&OsStr>, charset: Option<String>) -> Self {
+        let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
+            Some("c") | Some("rs") => ("text", "x-c"),
+            Some("css") => ("text", "css"),
+            Some("gif") => ("image", "gif"),
+            Some("gmi") | None => ("text", "gemini"),
+            Some("html") | Some("htm") => ("text", "html"),
+            Some("jpeg") | Some("jpg") => ("image", "jpeg"),
+            Some("js") => ("application", "x-javascript"),
+            Some("json") => ("application", "json"),
+            Some("m3u") => ("audio", "x-mpegurl"),
+            Some("mp3") => ("audio", "mpeg"),
+            Some("mp4") => ("video", "mp4"),
+            Some("ogg") => ("application", "ogg"),
+            Some("png") => ("image", "png"),
+            Some("py") => ("text", "x-script.python"),
+            Some("sh") => ("text", "x-shellscript"),
+            Some("svg") => ("image", "svg+xml"),
+            Some("torrent") => ("application", "x-bittorrent"),
+            Some("txt") | Some("tal") | Some("vf") => ("text", "plain"),
+            Some("wasm") => ("application", "wasm"),
+            Some("wav") => ("audio", "x-wav"),
+            Some("webm") => ("video", "webm"),
+            Some("webp") => ("image", "webp"),
+            Some("xml") | Some("xsl") => ("text", "xml"),
+            Some("zip") => ("application", "zip"),
+            Some("zstd") | Some("zst") => ("application", "zstd"),
+            Some(_) => ("application", "octet-stream"),
         };
 
         Self {

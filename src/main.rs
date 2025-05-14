@@ -1,6 +1,7 @@
+use async_zip::tokio::read::fs::ZipFileReader;
 use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::{io::AsyncWriteExt, net::TcpListener};
+use tokio::{io::{AsyncWriteExt, BufReader}, fs::File, net::TcpListener};
 use tokio_rustls::{
     TlsAcceptor,
     rustls::{
@@ -34,7 +35,8 @@ struct Opt {
 #[tokio::main]
 async fn main() {
     let opt = Opt::parse();
-    let srv = Arc::new(server::Server::new());
+    let zip = ZipFileReader::new(&opt.zip).await.unwrap();
+    let srv = Arc::new(server::Server::from_zip(zip));
     let cert = CertificateDer::pem_file_iter(&opt.cert)
         .expect("could not open certificate")
         .collect::<Result<Vec<_>, _>>()

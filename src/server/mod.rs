@@ -1,5 +1,14 @@
+use std::{
+    collections::BTreeMap,
+    ffi::{OsStr, OsString},
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+use async_zip::tokio::read::fs::ZipFileReader;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncBufRead, AsyncReadExt, AsyncSeek, AsyncWriteExt},
     net::TcpStream,
 };
 use tokio_rustls::server::TlsStream;
@@ -19,19 +28,40 @@ enum Error {
     Userinfo,
 }
 
-#[derive(Debug)]
-pub struct Server {}
+pub struct Server {
+    zip: ZipFileReader,
+    index: BTreeMap<PathBuf, usize>,
+}
 
 impl Server {
-    pub fn new() -> Self {
-        Self {}
+    pub fn from_zip(zip: ZipFileReader) -> Self {
+        let mut index = BTreeMap::new();
+
+        for (i, entry) in zip.file().entries().iter().enumerate() {
+            if entry.dir().unwrap() {
+                continue;
+            }
+
+            let path = Path::new("/").join(OsStr::from_bytes(entry.filename().as_bytes()));
+
+            if let Some("index.gmi") = path.file_name().and_then(OsStr::to_str) {
+                let mut newpath = path.clone();
+                newpath.pop();
+                index.insert(newpath, i);
+            }
+
+            index.insert(path, i);
+        }
+
+        Self { zip, index }
     }
 
     pub async fn handle_connection(&self, mut stream: &mut TlsStream<TcpStream>) {
         let request = self.parse_req(&mut stream).await;
 
         let response = if let Ok(request) = request {
-            todo!()
+            let path = Path::new("/").join(request.pathname());
+            self.get_file(&path).await
         } else {
             response::Response::bad_request()
         };
@@ -57,5 +87,20 @@ impl Server {
         }
 
         request::Request::parse(&buffer[..len])
+    }
+
+    async fn get_file(&self, path: &Path) -> response::Response {
+        let Some(index) = self.index.get(path) else {
+            return response::Response::not_found();
+        };
+        let Ok(mut entry) = self.zip.reader_with_entry(*index).await else {
+            return todo!();
+        };
+        let mut out = Vec::new();
+        if entry.read_to_end_checked(&mut out).await.is_err() {
+            return todo!();
+        }
+        let mimetype = response::MimeType::from_extension(path.extension(), None);
+        response::Response::with_type(mimetype, out)
     }
 }
