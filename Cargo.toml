@@ -12,6 +12,13 @@ foxerror = "0.1.1"
 tokio = { version = "1.45", features = ["rt-multi-thread", "net", "macros", "io-util", "fs"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["tls12", "ring"] }
 
+[features]
+default = ["deflate"]
+bzip2 = ["async_zip/bzip2"]
+deflate = ["async_zip/deflate"]
+xz = ["async_zip/xz"]
+zstd = ["async_zip/zstd"]
+
 [profile.smol]
 inherits = "release"
 opt-level = "z"
