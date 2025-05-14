@@ -5,12 +5,12 @@ license = "AGPL-3.0-or-later"
 edition = "2024"
 
 [dependencies]
-ada-url = "=3.2.3" # 3.2.4 is incompatible with cross' old gcc
+ada-url = { version = "=3.1.0", default-features = false } # newer ada-url versions break cross' old gcc
 argh = { version = "0.1.13", default-features = false, features = ["help"] }
-async_zip = { version = "0.0.17", features = ["tokio", "tokio-fs"] }
+async_zip = { version = "0.0.17", features = ["tokio-fs"] }
 foxerror = "0.1.1"
-tokio = { version = "1.45.0", features = ["rt-multi-thread", "net", "macros", "io-util", "fs"] }
-tokio-rustls = { version = "0.26.2", default-features = false, features = ["tls12", "ring"] }
+tokio = { version = "1.45", features = ["rt-multi-thread", "net", "macros", "io-util", "fs"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["tls12", "ring"] }
 
 [profile.smol]
 inherits = "release"
