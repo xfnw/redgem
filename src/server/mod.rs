@@ -1,14 +1,13 @@
 use std::{
     collections::BTreeMap,
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use async_zip::tokio::read::fs::ZipFileReader;
 use tokio::{
-    io::{AsyncBufRead, AsyncReadExt, AsyncSeek, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 use tokio_rustls::server::TlsStream;
@@ -56,8 +55,8 @@ impl Server {
         Self { zip, index }
     }
 
-    pub async fn handle_connection(&self, mut stream: &mut TlsStream<TcpStream>) {
-        let request = self.parse_req(&mut stream).await;
+    pub async fn handle_connection(&self, stream: &mut TlsStream<TcpStream>) {
+        let request = self.parse_req(stream).await;
 
         let response = if let Ok(request) = request {
             let path = Path::new("/").join(request.pathname());

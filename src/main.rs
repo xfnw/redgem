@@ -1,7 +1,9 @@
+#![deny(clippy::pedantic)]
+
 use async_zip::tokio::read::fs::ZipFileReader;
 use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::{io::{AsyncWriteExt, BufReader}, fs::File, net::TcpListener};
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tokio_rustls::{
     TlsAcceptor,
     rustls::{
@@ -41,7 +43,7 @@ async fn main() {
         .expect("could not open certificate")
         .collect::<Result<Vec<_>, _>>()
         .expect("could not parse certificate");
-    let key = PrivateKeyDer::from_pem_file(&opt.key.unwrap_or(opt.cert))
+    let key = PrivateKeyDer::from_pem_file(opt.key.unwrap_or(opt.cert))
         .expect("could not open private key");
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()

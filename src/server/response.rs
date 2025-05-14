@@ -10,12 +10,12 @@ pub struct MimeType {
 impl MimeType {
     pub fn from_extension(ext: Option<&OsStr>, charset: Option<String>) -> Self {
         let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
-            Some("c") | Some("rs") => ("text", "x-c"),
+            Some("c" | "rs") => ("text", "x-c"),
             Some("css") => ("text", "css"),
             Some("gif") => ("image", "gif"),
             Some("gmi") | None => ("text", "gemini"),
-            Some("html") | Some("htm") => ("text", "html"),
-            Some("jpeg") | Some("jpg") => ("image", "jpeg"),
+            Some("html" | "htm") => ("text", "html"),
+            Some("jpeg" | "jpg") => ("image", "jpeg"),
             Some("js") => ("application", "x-javascript"),
             Some("json") => ("application", "json"),
             Some("m3u") => ("audio", "x-mpegurl"),
@@ -27,14 +27,14 @@ impl MimeType {
             Some("sh") => ("text", "x-shellscript"),
             Some("svg") => ("image", "svg+xml"),
             Some("torrent") => ("application", "x-bittorrent"),
-            Some("txt") | Some("tal") | Some("vf") => ("text", "plain"),
+            Some("txt" | "tal" | "vf") => ("text", "plain"),
             Some("wasm") => ("application", "wasm"),
             Some("wav") => ("audio", "x-wav"),
             Some("webm") => ("video", "webm"),
             Some("webp") => ("image", "webp"),
-            Some("xml") | Some("xsl") => ("text", "xml"),
+            Some("xml" | "xsl") => ("text", "xml"),
             Some("zip") => ("application", "zip"),
-            Some("zstd") | Some("zst") => ("application", "zstd"),
+            Some("zstd" | "zst") => ("application", "zstd"),
             Some(_) => ("application", "octet-stream"),
         };
 
@@ -98,29 +98,29 @@ pub enum Response {
 }
 
 impl Response {
-    pub fn with_type(mimetype: MimeType, body: Vec<u8>) -> Self {
+    pub const fn with_type(mimetype: MimeType, body: Vec<u8>) -> Self {
         Self::Success { mimetype, body }
     }
 
-    pub fn not_found() -> Self {
+    pub const fn not_found() -> Self {
         Self::PermFail {
             kind: PermKind::NotFound,
         }
     }
 
-    pub fn bad_request() -> Self {
+    pub const fn bad_request() -> Self {
         Self::PermFail {
             kind: PermKind::BadRequest,
         }
     }
 
-    pub fn entry_fail() -> Self {
+    pub const fn entry_fail() -> Self {
         Self::TempFail {
             kind: TempKind::BadEntry,
         }
     }
 
-    pub fn entry_corrupted() -> Self {
+    pub const fn entry_corrupted() -> Self {
         Self::TempFail {
             kind: TempKind::Corrupted,
         }
