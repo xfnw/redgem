@@ -27,7 +27,7 @@ impl MimeType {
             Some("sh") => ("text", "x-shellscript"),
             Some("svg") => ("image", "svg+xml"),
             Some("torrent") => ("application", "x-bittorrent"),
-            Some("txt" | "tal" | "vf") => ("text", "plain"),
+            Some("txt" | "md" | "tal" | "toml" | "vf" | "yml" | "yaml") => ("text", "plain"),
             Some("wasm") => ("application", "wasm"),
             Some("wav") => ("audio", "x-wav"),
             Some("webm") => ("video", "webm"),
