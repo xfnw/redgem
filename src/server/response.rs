@@ -11,27 +11,36 @@ pub struct MimeType {
 impl MimeType {
     pub fn from_extension(ext: Option<&OsStr>, charset: Option<String>) -> Self {
         let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
-            Some("c" | "cpp" | "h" | "hpp" | "rs") => ("text", "x-c"),
+            Some("c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "hxx" | "rs") => ("text", "x-c"),
             Some("css") => ("text", "css"),
+            Some("csv") => ("text", "csv"),
+            Some("diff") => ("text", "x-diff"),
             Some("gif") => ("image", "gif"),
             Some("gmi" | "gemini") | None => ("text", "gemini"),
+            Some("go") => ("text", "x-go"),
             Some("gpub") => ("application", "gpub+zip"),
             Some("html" | "htm") => ("text", "html"),
             Some("jpeg" | "jpg") => ("image", "jpeg"),
-            Some("js") => ("application", "x-javascript"),
+            Some("js" | "mjs") => ("text", "javascript"),
             Some("json") => ("application", "json"),
             Some("m3u") => ("audio", "x-mpegurl"),
+            Some("md" | "mdwn" | "markdown") => ("text", "markdown"),
             Some("mp3") => ("audio", "mpeg"),
             Some("mp4") => ("video", "mp4"),
             Some("ogg") => ("application", "ogg"),
+            Some("patch") => ("text", "x-patch"),
+            Some("pdf") => ("application", "pdf"),
             Some("png") => ("image", "png"),
             Some("py") => ("text", "x-script.python"),
             Some("sh") => ("text", "x-shellscript"),
             Some("svg") => ("image", "svg+xml"),
             Some("torrent") => ("application", "x-bittorrent"),
-            Some("txt" | "lua" | "md" | "org" | "tal" | "toml" | "vf" | "yml" | "yaml") => {
-                ("text", "plain")
-            }
+            Some("tsv") => ("text", "tab-separated-values"),
+            Some(
+                "txt" | "asc" | "conf" | "el" | "log" | "lua" | "nix" | "org" | "pm" | "tal"
+                | "text" | "toml" | "vf" | "yml" | "yaml",
+            ) => ("text", "plain"),
+            Some("vcf" | "vcard") => ("text", "vcard"),
             Some("wasm") => ("application", "wasm"),
             Some("wav") => ("audio", "x-wav"),
             Some("webm") => ("video", "webm"),
