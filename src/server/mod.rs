@@ -26,6 +26,25 @@ enum Error {
     NonGeminiScheme,
     Userinfo,
     HasFragment,
+    NotFound,
+    BadEntry,
+    Corrupted,
+}
+
+impl Error {
+    fn bytes_append(&self, target: &mut Vec<u8>) {
+        target.extend_from_slice(match self {
+            Self::HeaderTooLong => b"59 header too long",
+            Self::BadLineEndings => b"59 bad line endings",
+            Self::NonUtf8(_) | Self::UnparseableUrl(_) => b"59 cannot parse url",
+            Self::NonGeminiScheme => b"53 gemini scheme required",
+            Self::Userinfo => b"59 your client leaks url userinfo! please report this",
+            Self::HasFragment => b"59 your client leaks url fragments! please report this",
+            Self::NotFound => b"51 not found",
+            Self::BadEntry => b"40 failed to open zip entry",
+            Self::Corrupted => b"40 zip entry corrupted",
+        });
+    }
 }
 
 pub struct Server {
@@ -59,11 +78,12 @@ impl Server {
     pub async fn handle_connection(&self, stream: &mut TlsStream<TcpStream>) {
         let request = self.parse_req(stream).await;
 
-        let response = if let Ok(request) = request {
-            let path = Path::new("/").join(OsStr::from_bytes(request.pathname().as_slice()));
-            self.get_file(&path).await
-        } else {
-            response::Response::bad_request()
+        let response = match request {
+            Ok(request) => {
+                let path = Path::new("/").join(OsStr::from_bytes(request.pathname().as_slice()));
+                self.get_file(&path).await
+            }
+            Err(e) => e.into(),
         };
 
         _ = stream.write_all(&response.into_bytes()).await;
@@ -91,14 +111,14 @@ impl Server {
 
     async fn get_file(&self, path: &Path) -> response::Response {
         let Some(index) = self.index.get(path) else {
-            return response::Response::not_found();
+            return Error::NotFound.into();
         };
         let Ok(mut entry) = self.zip.reader_with_entry(*index).await else {
-            return response::Response::entry_fail();
+            return Error::BadEntry.into();
         };
         let mut out = Vec::new();
         if entry.read_to_end_checked(&mut out).await.is_err() {
-            return response::Response::entry_corrupted();
+            return Error::Corrupted.into();
         }
         let mimetype = response::MimeType::from_extension(path.extension(), None);
         response::Response::with_type(mimetype, out)

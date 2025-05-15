@@ -1,3 +1,4 @@
+use super::Error;
 use std::ffi::OsStr;
 
 #[derive(Debug)]
@@ -62,71 +63,14 @@ impl MimeType {
 
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum TempKind {
-    BadEntry,
-    Corrupted,
-}
-
-impl TempKind {
-    fn bytes_append(&self, target: &mut Vec<u8>) {
-        target.extend_from_slice(match self {
-            Self::BadEntry => b"40 failed to open zip entry",
-            Self::Corrupted => b"40 zip entry corrupted",
-        });
-    }
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum PermKind {
-    NotFound,
-    BadRequest,
-}
-
-impl PermKind {
-    fn bytes_append(&self, target: &mut Vec<u8>) {
-        target.extend_from_slice(match self {
-            Self::NotFound => b"51 not found",
-            Self::BadRequest => b"59 bad request",
-        });
-    }
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
 pub enum Response {
     Success { mimetype: MimeType, body: Vec<u8> },
-    TempFail { kind: TempKind },
-    PermFail { kind: PermKind },
+    Failure { kind: Error },
 }
 
 impl Response {
     pub const fn with_type(mimetype: MimeType, body: Vec<u8>) -> Self {
         Self::Success { mimetype, body }
-    }
-
-    pub const fn not_found() -> Self {
-        Self::PermFail {
-            kind: PermKind::NotFound,
-        }
-    }
-
-    pub const fn bad_request() -> Self {
-        Self::PermFail {
-            kind: PermKind::BadRequest,
-        }
-    }
-
-    pub const fn entry_fail() -> Self {
-        Self::TempFail {
-            kind: TempKind::BadEntry,
-        }
-    }
-
-    pub const fn entry_corrupted() -> Self {
-        Self::TempFail {
-            kind: TempKind::Corrupted,
-        }
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
@@ -139,16 +83,18 @@ impl Response {
                 out.extend_from_slice(b"\r\n");
                 out.append(&mut body);
             }
-            Self::TempFail { kind } => {
-                kind.bytes_append(&mut out);
-                out.extend_from_slice(b"\r\n");
-            }
-            Self::PermFail { kind } => {
+            Self::Failure { kind } => {
                 kind.bytes_append(&mut out);
                 out.extend_from_slice(b"\r\n");
             }
         }
 
         out
+    }
+}
+
+impl From<Error> for Response {
+    fn from(err: Error) -> Self {
+        Self::Failure { kind: err }
     }
 }
