@@ -1,5 +1,5 @@
 use super::Error;
-use ada_url::Url;
+use url::Url;
 
 #[derive(Debug)]
 pub struct Request(Url);
@@ -22,17 +22,17 @@ impl Request {
             }
         };
 
-        let u = Url::parse(s, None)?;
+        let u = Url::parse(&s)?;
 
-        if u.protocol() != "gemini:" {
+        if u.scheme() != "gemini" {
             return Err(Error::NonGeminiScheme);
         }
 
-        if u.has_credentials() {
+        if u.username() != "" || u.password().is_some() {
             return Err(Error::Userinfo);
         }
 
-        if u.has_hash() {
+        if u.fragment().is_some() {
             return Err(Error::HasFragment);
         }
 
@@ -41,7 +41,7 @@ impl Request {
 
     #[inline]
     pub fn pathname(&self) -> &str {
-        self.0.pathname()
+        self.0.path()
     }
 }
 
