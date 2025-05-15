@@ -60,7 +60,7 @@ impl Server {
         let request = self.parse_req(stream).await;
 
         let response = if let Ok(request) = request {
-            let path = Path::new("/").join(request.pathname());
+            let path = Path::new("/").join(OsStr::from_bytes(request.pathname().as_slice()));
             self.get_file(&path).await
         } else {
             response::Response::bad_request()

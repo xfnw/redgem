@@ -531,6 +531,7 @@ dependencies = [
  "argh",
  "async_zip",
  "foxerror",
+ "percent-encoding",
  "tokio",
  "tokio-rustls",
  "url",

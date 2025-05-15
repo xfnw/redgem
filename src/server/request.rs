@@ -1,4 +1,5 @@
 use super::Error;
+use percent_encoding::percent_decode_str;
 use url::Url;
 
 #[derive(Debug)]
@@ -40,8 +41,8 @@ impl Request {
     }
 
     #[inline]
-    pub fn pathname(&self) -> &str {
-        self.0.path()
+    pub fn pathname(&self) -> Vec<u8> {
+        percent_decode_str(self.0.path()).collect()
     }
 }
 
@@ -69,7 +70,7 @@ mod tests {
             Request::parse(b"gemini://example.com/meow\r\n")
                 .unwrap()
                 .pathname(),
-            "/meow"
+            b"/meow"
         );
     }
 }
