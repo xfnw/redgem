@@ -10,7 +10,7 @@ pub struct MimeType {
 impl MimeType {
     pub fn from_extension(ext: Option<&OsStr>, charset: Option<String>) -> Self {
         let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
-            Some("c" | "rs") => ("text", "x-c"),
+            Some("c" | "cpp" | "h" | "hpp" | "rs") => ("text", "x-c"),
             Some("css") => ("text", "css"),
             Some("gif") => ("image", "gif"),
             Some("gmi" | "gemini") | None => ("text", "gemini"),
@@ -28,7 +28,9 @@ impl MimeType {
             Some("sh") => ("text", "x-shellscript"),
             Some("svg") => ("image", "svg+xml"),
             Some("torrent") => ("application", "x-bittorrent"),
-            Some("txt" | "md" | "org" | "tal" | "toml" | "vf" | "yml" | "yaml") => ("text", "plain"),
+            Some("txt" | "lua" | "md" | "org" | "tal" | "toml" | "vf" | "yml" | "yaml") => {
+                ("text", "plain")
+            }
             Some("wasm") => ("application", "wasm"),
             Some("wav") => ("audio", "x-wav"),
             Some("webm") => ("video", "webm"),
