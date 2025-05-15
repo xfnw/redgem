@@ -32,6 +32,10 @@ impl Request {
             return Err(Error::Userinfo);
         }
 
+        if u.has_hash() {
+            return Err(Error::HasFragment);
+        }
+
         Ok(Self(u))
     }
 

@@ -25,6 +25,7 @@ enum Error {
     UnparseableUrl(ada_url::ParseUrlError<String>),
     NonGeminiScheme,
     Userinfo,
+    HasFragment,
 }
 
 pub struct Server {
