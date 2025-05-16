@@ -85,7 +85,7 @@ pub enum Response<B> {
 }
 
 impl<B> Response<B> {
-    pub const fn with_type(mimetype: MimeType, body: B) -> Response<B> {
+    pub const fn with_type(mimetype: MimeType, body: B) -> Self {
         Self::Success { mimetype, body }
     }
 
@@ -128,7 +128,7 @@ pin_project! {
 }
 
 impl<T, U> OptionalChain<T, U> {
-    pub fn chain(first: T, second: U) -> Self {
+    pub const fn chain(first: T, second: U) -> Self {
         Self::Chain {
             first,
             second,
@@ -136,7 +136,7 @@ impl<T, U> OptionalChain<T, U> {
         }
     }
 
-    pub fn single(first: T) -> Self {
+    pub const fn single(first: T) -> Self {
         Self::Single { first }
     }
 }

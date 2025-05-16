@@ -38,7 +38,7 @@ enum Error {
 }
 
 impl Error {
-    fn bytes(&self) -> &'static [u8] {
+    const fn bytes(&self) -> &'static [u8] {
         match self {
             Self::HeaderTooLong => b"59 header too long\r\n",
             Self::BadLineEndings => b"59 bad line endings\r\n",
