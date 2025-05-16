@@ -1,5 +1,13 @@
+use pin_project_lite::pin_project;
+use tokio::io::{AsyncRead, ReadBuf};
+
 use super::Error;
-use std::ffi::OsStr;
+use std::{
+    ffi::OsStr,
+    io::Cursor,
+    pin::Pin,
+    task::{Context, Poll, ready},
+};
 
 #[derive(Debug)]
 pub struct MimeType {
@@ -70,40 +78,98 @@ impl MimeType {
     }
 }
 
-#[derive(Debug)]
 #[non_exhaustive]
-pub enum Response {
-    Success { mimetype: MimeType, body: Vec<u8> },
+pub enum Response<B> {
+    Success { mimetype: MimeType, body: B },
     Failure { kind: Error },
 }
 
-impl Response {
-    pub const fn with_type(mimetype: MimeType, body: Vec<u8>) -> Self {
+impl<B> Response<B> {
+    pub const fn with_type(mimetype: MimeType, body: B) -> Response<B> {
         Self::Success { mimetype, body }
     }
 
-    pub fn into_bytes(self) -> Vec<u8> {
-        let mut out = Vec::new();
-
+    pub fn into_read(self) -> OptionalChain<Cursor<Vec<u8>>, B> {
         match self {
-            Self::Success { mimetype, mut body } => {
-                out.extend_from_slice(b"20 ");
-                mimetype.bytes_append(&mut out);
-                out.extend_from_slice(b"\r\n");
-                out.append(&mut body);
+            Self::Success { mimetype, body } => {
+                let mut header = b"20 ".to_vec();
+                mimetype.bytes_append(&mut header);
+                header.extend_from_slice(b"\r\n");
+                OptionalChain::chain(Cursor::new(header), body)
             }
-            Self::Failure { kind } => {
-                kind.bytes_append(&mut out);
-                out.extend_from_slice(b"\r\n");
-            }
+            Self::Failure { kind } => OptionalChain::single(Cursor::new(kind.bytes().to_vec())),
         }
-
-        out
     }
 }
 
-impl From<Error> for Response {
+impl<B> From<Error> for Response<B> {
     fn from(err: Error) -> Self {
         Self::Failure { kind: err }
+    }
+}
+
+pin_project! {
+    /// tokio's Chain but optional
+    #[project = OptionalChainProject]
+    #[must_use = "you should read this"]
+    pub enum OptionalChain<T, U> {
+        Chain {
+            #[pin]
+            first: T,
+            #[pin]
+            second: U,
+            done_first: bool,
+        },
+        Single {
+            #[pin]
+            first: T,
+        },
+    }
+}
+
+impl<T, U> OptionalChain<T, U> {
+    pub fn chain(first: T, second: U) -> Self {
+        Self::Chain {
+            first,
+            second,
+            done_first: false,
+        }
+    }
+
+    pub fn single(first: T) -> Self {
+        Self::Single { first }
+    }
+}
+
+impl<T, U> AsyncRead for OptionalChain<T, U>
+where
+    T: AsyncRead,
+    U: AsyncRead,
+{
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        match self.project() {
+            OptionalChainProject::Chain {
+                first,
+                second,
+                done_first,
+            } => {
+                if !*done_first {
+                    let rem = buf.remaining();
+                    ready!(first.poll_read(cx, buf))?;
+                    if buf.remaining() == rem {
+                        *done_first = true;
+                    } else {
+                        return Poll::Ready(Ok(()));
+                    }
+                }
+
+                second.poll_read(cx, buf)
+            }
+            OptionalChainProject::Single { first } => first.poll_read(cx, buf),
+        }
     }
 }

@@ -1,4 +1,7 @@
-use async_zip::tokio::read::fs::ZipFileReader;
+use async_zip::{
+    base::read::{WithEntry, ZipEntryReader},
+    tokio::read::fs::ZipFileReader,
+};
 use std::{
     collections::BTreeMap,
     ffi::OsStr,
@@ -7,11 +10,13 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    fs::File,
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader, copy},
     net::TcpStream,
     time::timeout,
 };
 use tokio_rustls::server::TlsStream;
+use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
 
 mod request;
 mod response;
@@ -29,24 +34,22 @@ enum Error {
     HasFragment,
     NotFound,
     BadEntry,
-    Corrupted,
     Timeout,
 }
 
 impl Error {
-    fn bytes_append(&self, target: &mut Vec<u8>) {
-        target.extend_from_slice(match self {
-            Self::HeaderTooLong => b"59 header too long",
-            Self::BadLineEndings => b"59 bad line endings",
-            Self::NonUtf8(_) | Self::UnparseableUrl(_) => b"59 cannot parse url",
-            Self::NonGeminiScheme => b"53 gemini scheme required",
-            Self::Userinfo => b"59 your client leaks url userinfo! please report this",
-            Self::HasFragment => b"59 your client leaks url fragments! please report this",
-            Self::NotFound => b"51 not found",
-            Self::BadEntry => b"40 failed to open zip entry",
-            Self::Corrupted => b"40 zip entry corrupted",
-            Self::Timeout => b"40 timed out",
-        });
+    fn bytes(&self) -> &'static [u8] {
+        match self {
+            Self::HeaderTooLong => b"59 header too long\r\n",
+            Self::BadLineEndings => b"59 bad line endings\r\n",
+            Self::NonUtf8(_) | Self::UnparseableUrl(_) => b"59 cannot parse url\r\n",
+            Self::NonGeminiScheme => b"53 gemini scheme required\r\n",
+            Self::Userinfo => b"59 your client leaks url userinfo! please report this\r\n",
+            Self::HasFragment => b"59 your client leaks url fragments! please report this\r\n",
+            Self::NotFound => b"51 not found\r\n",
+            Self::BadEntry => b"40 failed to open zip entry\r\n",
+            Self::Timeout => b"40 timed out\r\n",
+        }
     }
 }
 
@@ -83,7 +86,7 @@ impl Server {
         else {
             _ = timeout(
                 Duration::from_secs(30),
-                send_response(stream, Error::Timeout.into()),
+                send_response::<&[u8]>(stream, Error::Timeout.into()),
             )
             .await;
             return;
@@ -120,24 +123,27 @@ impl Server {
         request::Request::parse(&buffer[..len])
     }
 
-    async fn get_file(&self, path: &Path) -> response::Response {
+    async fn get_file(
+        &self,
+        path: &Path,
+    ) -> response::Response<Compat<ZipEntryReader<'_, Compat<BufReader<File>>, WithEntry<'_>>>>
+    {
         let Some(index) = self.index.get(path) else {
             return Error::NotFound.into();
         };
-        let Ok(mut entry) = self.zip.reader_with_entry(*index).await else {
+        let Ok(entry) = self.zip.reader_with_entry(*index).await else {
             return Error::BadEntry.into();
         };
-        let mut out = Vec::new();
-        if entry.read_to_end_checked(&mut out).await.is_err() {
-            return Error::Corrupted.into();
-        }
         let mimetype = response::MimeType::from_extension(path.extension(), None);
-        response::Response::with_type(mimetype, out)
+        response::Response::with_type(mimetype, entry.compat())
     }
 }
 
-async fn send_response(mut stream: TlsStream<TcpStream>, response: response::Response) {
-    if stream.write_all(&response.into_bytes()).await.is_ok() {
+async fn send_response<R>(mut stream: TlsStream<TcpStream>, response: response::Response<R>)
+where
+    R: AsyncRead + Unpin,
+{
+    if copy(&mut response.into_read(), &mut stream).await.is_ok() {
         _ = stream.shutdown().await;
     }
 }

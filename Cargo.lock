@@ -532,8 +532,10 @@ dependencies = [
  "async_zip",
  "foxerror",
  "percent-encoding",
+ "pin-project-lite",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "url",
 ]
 
