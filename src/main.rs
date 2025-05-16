@@ -2,8 +2,8 @@
 
 use argh::FromArgs;
 use async_zip::tokio::read::fs::ZipFileReader;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
-use tokio::{io::AsyncWriteExt, net::TcpListener};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use tokio::{net::TcpListener, time::timeout};
 use tokio_rustls::{
     TlsAcceptor,
     rustls::{
@@ -66,13 +66,12 @@ async fn main() {
         let srv = srv.clone();
 
         tokio::spawn(async move {
-            let Ok(mut stream) = acceptor.accept(sock).await else {
+            let Ok(Ok(stream)) = timeout(Duration::from_secs(10), acceptor.accept(sock)).await
+            else {
                 return;
             };
 
-            srv.handle_connection(&mut stream).await;
-
-            _ = stream.shutdown().await;
+            srv.handle_connection(stream).await;
         });
     }
 }

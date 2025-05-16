@@ -1,14 +1,15 @@
+use async_zip::tokio::read::fs::ZipFileReader;
 use std::{
     collections::BTreeMap,
     ffi::OsStr,
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
+    time::Duration,
 };
-
-use async_zip::tokio::read::fs::ZipFileReader;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    time::timeout,
 };
 use tokio_rustls::server::TlsStream;
 
@@ -29,6 +30,7 @@ enum Error {
     NotFound,
     BadEntry,
     Corrupted,
+    Timeout,
 }
 
 impl Error {
@@ -43,6 +45,7 @@ impl Error {
             Self::NotFound => b"51 not found",
             Self::BadEntry => b"40 failed to open zip entry",
             Self::Corrupted => b"40 zip entry corrupted",
+            Self::Timeout => b"40 timed out",
         });
     }
 }
@@ -75,8 +78,16 @@ impl Server {
         Self { zip, index }
     }
 
-    pub async fn handle_connection(&self, stream: &mut TlsStream<TcpStream>) {
-        let request = self.parse_req(stream).await;
+    pub async fn handle_connection(&self, mut stream: TlsStream<TcpStream>) {
+        let Ok(request) = timeout(Duration::from_secs(30), self.parse_req(&mut stream)).await
+        else {
+            _ = timeout(
+                Duration::from_secs(30),
+                send_response(stream, Error::Timeout.into()),
+            )
+            .await;
+            return;
+        };
 
         let response = match request {
             Ok(request) => {
@@ -86,7 +97,7 @@ impl Server {
             Err(e) => e.into(),
         };
 
-        _ = stream.write_all(&response.into_bytes()).await;
+        _ = timeout(Duration::from_secs(300), send_response(stream, response)).await;
     }
 
     async fn parse_req(
@@ -122,5 +133,11 @@ impl Server {
         }
         let mimetype = response::MimeType::from_extension(path.extension(), None);
         response::Response::with_type(mimetype, out)
+    }
+}
+
+async fn send_response(mut stream: TlsStream<TcpStream>, response: response::Response) {
+    if stream.write_all(&response.into_bytes()).await.is_ok() {
+        _ = stream.shutdown().await;
     }
 }
