@@ -11,16 +11,17 @@ foxerror = "0.1.1"
 percent-encoding = { version = "2.3.1", default-features = false }
 pin-project-lite = "0.2.16"
 tokio = { version = "1.45", features = ["rt-multi-thread", "net", "macros", "io-util", "fs", "time"] }
-tokio-rustls = { version = "0.26", default-features = false, features = ["tls12", "ring"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 tokio-util = { version = "0.7.15", features = ["compat"] }
 url = { version = "2.5.4", default-features = false }
 
 [features]
-default = ["deflate"]
+default = ["deflate", "tls12"]
 bzip2 = ["async_zip/bzip2"]
 deflate = ["async_zip/deflate"]
 xz = ["async_zip/xz"]
 zstd = ["async_zip/zstd"]
+tls12 = ["tokio-rustls/tls12"]
 
 [profile.smol]
 inherits = "release"
