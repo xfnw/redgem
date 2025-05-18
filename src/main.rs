@@ -13,6 +13,8 @@ use tokio_rustls::{
 };
 
 mod server;
+#[cfg(test)]
+mod tests;
 
 /// a zipapp gemini server
 #[derive(Debug, FromArgs)]
