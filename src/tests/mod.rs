@@ -59,7 +59,7 @@ where
     addr
 }
 
-async fn get_notify(addr: SocketAddr) -> bool {
+async fn get_notify(addr: SocketAddr, req: &[u8]) -> bool {
     let mut trust = RootCertStore::empty();
     trust
         .add(CertificateDer::from_pem_file(CERT_PATH).unwrap())
@@ -72,7 +72,7 @@ async fn get_notify(addr: SocketAddr) -> bool {
     let sock = TcpStream::connect(&addr).await.unwrap();
     let mut stream = connector.connect(sn, sock).await.unwrap();
 
-    stream.write_all(b"gemini://localhost/\r\n").await.unwrap();
+    stream.write_all(req).await.unwrap();
 
     let mut sink = sink();
     copy(&mut stream, &mut sink).await.is_ok()
@@ -89,7 +89,8 @@ async fn close_notify() {
         })
     })
     .await;
-    assert!(get_notify(addr).await);
+    assert!(get_notify(addr, b"gemini://localhost/\r\n").await);
+    assert!(get_notify(addr, b"gemini://localhost/doesnotexist\r\n").await);
 }
 
 /// make sure rustls' behavior of not sending close_notify when [`TlsStream`] is dropped without
@@ -98,5 +99,5 @@ async fn close_notify() {
 #[tokio::test]
 async fn no_shutdown() {
     let addr = serve_tls(|_| Box::pin(async {})).await;
-    assert!(!get_notify(addr).await);
+    assert!(!get_notify(addr, b"gemini://localhost/\r\n").await);
 }
