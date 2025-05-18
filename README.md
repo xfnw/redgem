@@ -21,7 +21,10 @@ zip -A redgem.zip
 to run it you'll need a tls certificate, a simple self-signed one can
 be created with with openssl
 ```
-openssl req -x509 -newkey rsa:4096 -days 3650 -nodes -keyout gemini.pem -out gemini.pem -subj "/CN=example.com"
+openssl req -x509 -newkey rsa:4096 -days 3650 -nodes \
+ -keyout gemini.pem -out gemini.pem -subj "/CN=example.com" \
+ -addext "subjectAltName = DNS:example.com, IP:127.0.0.1, IP:::1" \
+ -addext basicConstraints=critical,CA:FALSE
 ```
 
 then run the zip file while passing it the certificate
