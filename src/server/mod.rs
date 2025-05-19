@@ -55,7 +55,7 @@ impl Error {
 
 pub struct Server {
     zip: ZipFileReader,
-    index: BTreeMap<PathBuf, usize>,
+    index: BTreeMap<PathBuf, (usize, bool)>,
 }
 
 impl Server {
@@ -72,10 +72,10 @@ impl Server {
             if let Some("index.gmi") = path.file_name().and_then(OsStr::to_str) {
                 let mut newpath = path.clone();
                 newpath.pop();
-                index.insert(newpath, i);
+                index.insert(newpath, (i, true));
             }
 
-            index.insert(path, i);
+            index.insert(path, (i, false));
         }
 
         Self { zip, index }
@@ -128,13 +128,16 @@ impl Server {
         path: &Path,
     ) -> response::Response<Compat<ZipEntryReader<'_, Compat<BufReader<File>>, WithEntry<'_>>>>
     {
-        let Some(index) = self.index.get(path) else {
+        let Some(&(id, is_index)) = self.index.get(path) else {
             return Error::NotFound.into();
         };
-        let Ok(entry) = self.zip.reader_with_entry(*index).await else {
+        let Ok(entry) = self.zip.reader_with_entry(id).await else {
             return Error::BadEntry.into();
         };
-        let mimetype = response::MimeType::from_extension(path.extension(), None);
+        let mimetype = response::MimeType::from_extension(
+            if is_index { None } else { path.extension() },
+            None,
+        );
         response::Response::with_type(mimetype, entry.compat())
     }
 }
