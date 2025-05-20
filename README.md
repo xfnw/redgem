@@ -6,26 +6,33 @@ redgem can be built with cargo
 ```
 cargo build -r
 ```
+optionally, cross compiling with [cross] to a musl target and
+`--profile smol` can be used to get a more portable (static) and
+smaller binary. there are also some features that can be toggled,
+a list of them is in `Cargo.toml`
 
-prepare a zip of the files you want to serve. then, concatenate it with
-the redgem binary and fix it up
+[cross]: https://github.com/cross-rs/cross
+
+turning it into a zipapp is as simple as concatenating a zip of the
+files you want to serve with the redgem binary, setting it executable,
+and correcting the zip offsets
 ```
-echo hello world > index.gmi
-zip files.zip index.gmi
-cat target/release/redgem files.zip > redgem.zip
+cat target/release/redgem src/tests/test.zip > redgem.zip
 chmod +x redgem.zip
 zip -A redgem.zip
 ```
 
 ## usage
-to run it you'll need a tls certificate, a simple self-signed one can
-be created with with openssl
+to run it you'll need a tls certificate, a reasonable self-signed one
+can be created with with openssl
 ```
 openssl req -x509 -newkey rsa:4096 -days 3650 -nodes \
  -keyout gemini.pem -out gemini.pem -subj "/CN=example.com" \
  -addext "subjectAltName = DNS:example.com, IP:127.0.0.1, IP:::1" \
  -addext basicConstraints=critical,CA:FALSE
 ```
+if you do not care about users of older tls libraries, `ed25519`
+instead of `rsa:4096` gives a much nicer smaller certificate
 
 then run the zip file while passing it the certificate
 ```
