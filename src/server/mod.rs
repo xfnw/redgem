@@ -24,9 +24,8 @@ mod response;
 #[derive(Debug, Eq, PartialEq, foxerror::FoxError)]
 enum Error {
     HeaderTooLong,
-    BadLineEndings,
     #[err(from)]
-    NonUtf8(std::string::FromUtf8Error),
+    NonUtf8(std::str::Utf8Error),
     #[err(from)]
     UnparseableUrl(url::ParseError),
     NonGeminiScheme,
@@ -41,7 +40,6 @@ impl Error {
     const fn bytes(&self) -> &'static [u8] {
         match self {
             Self::HeaderTooLong => b"59 header too long\r\n",
-            Self::BadLineEndings => b"59 bad line endings\r\n",
             Self::NonUtf8(_) | Self::UnparseableUrl(_) => b"59 cannot parse url\r\n",
             Self::NonGeminiScheme => b"53 gemini scheme required\r\n",
             Self::Userinfo => b"59 your client leaks url userinfo! please report this\r\n",
@@ -112,15 +110,15 @@ impl Server {
 
         loop {
             let Ok(count @ 1..) = stream.read(&mut buffer[len..]).await else {
-                break;
+                return Err(Error::HeaderTooLong);
             };
             len += count;
-            if buffer[len - 1] == b'\n' {
+            if buffer[..len].ends_with(b"\r\n") {
                 break;
             }
         }
 
-        request::Request::parse(&buffer[..len])
+        request::Request::parse(&buffer[..len - 2])
     }
 
     async fn get_file(
