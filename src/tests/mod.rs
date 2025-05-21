@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 use tokio::{
-    io::{AsyncWriteExt, copy, sink},
+    io::{AsyncWriteExt, copy},
     net::{TcpListener, TcpStream},
 };
 use tokio_rustls::{
@@ -59,7 +59,7 @@ where
     addr
 }
 
-async fn get_notify(addr: SocketAddr, req: &[u8]) -> bool {
+async fn request(addr: SocketAddr, req: &[u8]) -> Result<Vec<u8>, std::io::Error> {
     let mut trust = RootCertStore::empty();
     trust
         .add(CertificateDer::from_pem_file(CERT_PATH).unwrap())
@@ -74,12 +74,13 @@ async fn get_notify(addr: SocketAddr, req: &[u8]) -> bool {
 
     stream.write_all(req).await.unwrap();
 
-    let mut sink = sink();
-    copy(&mut stream, &mut sink).await.is_ok()
+    let mut out = Vec::new();
+    copy(&mut stream, &mut out).await?;
+    Ok(out)
 }
 
 #[tokio::test]
-async fn close_notify() {
+async fn index() {
     let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
     let srv = Arc::new(Server::from_zip(zip));
     let addr = serve_tls(move |s| {
@@ -89,8 +90,44 @@ async fn close_notify() {
         })
     })
     .await;
-    assert!(get_notify(addr, b"gemini://localhost/\r\n").await);
-    assert!(get_notify(addr, b"gemini://localhost/doesnotexist\r\n").await);
+    assert_eq!(
+        request(addr, b"gemini://localhost/\r\n").await.unwrap(),
+        b"20 text/gemini\r\nhewwo world\n"
+    );
+    assert_eq!(
+        request(addr, b"gemini://localhost\r\n").await.unwrap(),
+        b"20 text/gemini\r\nhewwo world\n"
+    );
+}
+
+#[tokio::test]
+async fn length() {
+    let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
+    let srv = Arc::new(Server::from_zip(zip));
+    let addr = serve_tls(move |s| {
+        let srv = srv.clone();
+        Box::pin(async move {
+            srv.handle_connection(s).await;
+        })
+    })
+    .await;
+    let mut hhhh = b"gemini://localhost/".to_vec();
+    hhhh.extend_from_slice(&[b'h'; 1024]);
+    let eol = b"\r\n";
+
+    let mut short = hhhh[..1024].to_vec();
+    short.extend_from_slice(eol);
+    assert_eq!(
+        request(addr, short.as_slice()).await.unwrap(),
+        b"51 not found\r\n"
+    );
+
+    let mut long = hhhh[..1025].to_vec();
+    long.extend_from_slice(eol);
+    assert_eq!(
+        request(addr, long.as_slice()).await.unwrap(),
+        b"59 header too long\r\n"
+    );
 }
 
 /// make sure rustls' behavior of not sending close_notify when [`TlsStream`] is dropped without
@@ -99,5 +136,5 @@ async fn close_notify() {
 #[tokio::test]
 async fn no_shutdown() {
     let addr = serve_tls(|_| Box::pin(async {})).await;
-    assert!(!get_notify(addr, b"gemini://localhost/\r\n").await);
+    assert!(request(addr, b"gemini://localhost/\r\n").await.is_err());
 }
