@@ -13,11 +13,10 @@ use std::{
 pub struct MimeType {
     domtype: &'static str,
     subtype: &'static str,
-    charset: Option<String>,
 }
 
 impl MimeType {
-    pub fn from_extension(ext: Option<&OsStr>, charset: Option<String>) -> Self {
+    pub fn from_extension(ext: Option<&OsStr>) -> Self {
         let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
             Some("c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "hxx" | "rs") => ("text", "x-c"),
             Some("css") => ("text", "css"),
@@ -59,22 +58,13 @@ impl MimeType {
             Some(_) => ("application", "octet-stream"),
         };
 
-        Self {
-            domtype,
-            subtype,
-            charset,
-        }
+        Self { domtype, subtype }
     }
 
     fn bytes_append(&self, target: &mut Vec<u8>) {
         target.extend_from_slice(self.domtype.as_bytes());
         target.push(b'/');
         target.extend_from_slice(self.subtype.as_bytes());
-
-        if let Some(charset) = &self.charset {
-            target.extend_from_slice(b"; charset=");
-            target.extend_from_slice(charset.as_bytes());
-        }
     }
 }
 

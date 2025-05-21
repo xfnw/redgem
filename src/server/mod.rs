@@ -134,10 +134,8 @@ impl Server {
         let Ok(entry) = self.zip.reader_with_entry(id).await else {
             return Error::BadEntry.into();
         };
-        let mimetype = response::MimeType::from_extension(
-            if is_index { None } else { path.extension() },
-            None,
-        );
+        let mimetype =
+            response::MimeType::from_extension(if is_index { None } else { path.extension() });
         response::Response::with_type(mimetype, entry.compat())
     }
 }
