@@ -113,12 +113,10 @@ impl Server {
                 return Err(Error::HeaderTooLong);
             };
             len += count;
-            if buffer[..len].ends_with(b"\r\n") {
-                break;
+            if let Some(buf) = buffer[..len].strip_suffix(b"\r\n") {
+                return request::Request::parse(buf);
             }
         }
-
-        request::Request::parse(&buffer[..len - 2])
     }
 
     async fn get_file(
