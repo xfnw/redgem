@@ -1,23 +1,26 @@
 use super::Error;
-use percent_encoding::percent_decode_str;
-use url::Url;
+use fluent_uri::{Uri, component::Scheme, encoding::Decode};
 
 #[derive(Debug)]
-pub struct Request(Url);
+pub struct Request(Uri<String>);
 
 impl Request {
     pub fn parse(inp: &[u8]) -> Result<Self, Error> {
-        let u = Url::parse(str::from_utf8(inp)?)?;
+        let u = Uri::parse(str::from_utf8(inp)?.to_string()).map_err(|_| Error::UnparseableUri)?;
 
-        if u.scheme() != "gemini" {
+        if u.scheme() != const { Scheme::new_or_panic("gemini") } {
             return Err(Error::NonGeminiScheme);
         }
 
-        if u.username() != "" || u.password().is_some() {
-            return Err(Error::Userinfo);
+        if let Some(authority) = u.authority() {
+            if authority.has_userinfo() {
+                return Err(Error::Userinfo);
+            }
+        } else {
+            return Err(Error::NoAuthority);
         }
 
-        if u.fragment().is_some() {
+        if u.has_fragment() {
             return Err(Error::HasFragment);
         }
 
@@ -26,7 +29,10 @@ impl Request {
 
     #[inline]
     pub fn pathname(&self) -> Vec<u8> {
-        percent_decode_str(self.0.path()).collect()
+        match self.0.path().decode() {
+            Decode::Borrowed(b) => b.as_bytes().to_vec(),
+            Decode::Owned(v) => v,
+        }
     }
 }
 

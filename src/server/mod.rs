@@ -26,9 +26,9 @@ enum Error {
     HeaderTooLong,
     #[err(from)]
     NonUtf8(std::str::Utf8Error),
-    #[err(from)]
-    UnparseableUrl(url::ParseError),
+    UnparseableUri,
     NonGeminiScheme,
+    NoAuthority,
     Userinfo,
     HasFragment,
     NotFound,
@@ -40,8 +40,9 @@ impl Error {
     const fn bytes(&self) -> &'static [u8] {
         match self {
             Self::HeaderTooLong => b"59 header too long\r\n",
-            Self::NonUtf8(_) | Self::UnparseableUrl(_) => b"59 cannot parse url\r\n",
+            Self::NonUtf8(_) | Self::UnparseableUri => b"59 cannot parse url\r\n",
             Self::NonGeminiScheme => b"53 gemini scheme required\r\n",
+            Self::NoAuthority => b"59 missing url authority\r\n",
             Self::Userinfo => b"59 your client leaks url userinfo! please report this\r\n",
             Self::HasFragment => b"59 your client leaks url fragments! please report this\r\n",
             Self::NotFound => b"51 not found\r\n",
