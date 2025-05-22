@@ -28,11 +28,8 @@ impl Request {
     }
 
     #[inline]
-    pub fn pathname(&self) -> Vec<u8> {
-        match self.0.path().decode() {
-            Decode::Borrowed(b) => b.as_bytes().to_vec(),
-            Decode::Owned(v) => v,
-        }
+    pub fn pathname(&self) -> Decode<'_> {
+        self.0.path().decode()
     }
 }
 
@@ -45,7 +42,8 @@ mod tests {
         assert_eq!(
             Request::parse(b"gemini://example.com/meow")
                 .unwrap()
-                .pathname(),
+                .pathname()
+                .as_bytes(),
             b"/meow"
         );
     }

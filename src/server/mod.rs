@@ -93,7 +93,7 @@ impl Server {
 
         let response = match request {
             Ok(request) => {
-                let path = Path::new("/").join(OsStr::from_bytes(request.pathname().as_slice()));
+                let path = Path::new("/").join(OsStr::from_bytes(request.pathname().as_bytes()));
                 self.get_file(&path).await
             }
             Err(e) => e.into(),
