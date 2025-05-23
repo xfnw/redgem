@@ -400,6 +400,7 @@ dependencies = [
  "async_zip",
  "fluent-uri",
  "foxerror",
+ "libc",
  "pin-project-lite",
  "tokio",
  "tokio-rustls",

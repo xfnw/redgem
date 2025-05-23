@@ -2,8 +2,13 @@
 
 use argh::FromArgs;
 use async_zip::tokio::read::fs::ZipFileReader;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-use tokio::{net::TcpListener, time::timeout};
+use std::{
+    net::{SocketAddr, TcpListener},
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
+use tokio::time::timeout;
 use tokio_rustls::{
     TlsAcceptor,
     rustls::{
@@ -23,6 +28,9 @@ struct Opt {
     /// address to listen on
     #[argh(option, default = "\"[::]:1965\".parse().unwrap()")]
     bind: SocketAddr,
+    /// fork into background after starting
+    #[argh(switch)]
+    daemon: bool,
     /// zip file to serve files from.
     ///
     /// defaults to the current binary in procfs, serving files from a
@@ -40,27 +48,59 @@ struct Opt {
     key: Option<PathBuf>,
 }
 
-#[tokio::main]
-async fn main() {
+/// # Safety
+/// if used while multiple threads exist, only c "async-signal-safe" functions may be used until
+/// the next exec to avoid invoking c undefined behavior. using this with multiple threads is
+/// pretty pointless, consider not doing it.
+///
+/// forking also messes with quite a few little things that may break rust's safety guarantees,
+/// see `fork(2)` for an exhaustive list.
+unsafe fn daemonize() {
+    // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
+    // but see above doc comment for issues not covered by that
+    match unsafe { libc::fork() } {
+        0 => (),
+        1.. => std::process::exit(0),
+        -1 => panic!("failed to fork"),
+        _ => unreachable!(),
+    }
+}
+
+fn main() {
     let opt: Opt = argh::from_env();
-    let zip = ZipFileReader::new(&opt.zip)
-        .await
-        .expect("failed to open zip");
-    let srv = Arc::new(server::Server::from_zip(zip));
     let cert = CertificateDer::pem_file_iter(&opt.cert)
         .expect("could not open certificate")
         .collect::<Result<Vec<_>, _>>()
         .expect("could not parse certificate");
-    let key = PrivateKeyDer::from_pem_file(opt.key.unwrap_or(opt.cert))
+    let key = PrivateKeyDer::from_pem_file(opt.key.as_ref().unwrap_or(&opt.cert))
         .expect("could not open private key");
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(cert, key)
         .unwrap();
     let acceptor = TlsAcceptor::from(Arc::new(config));
-    let listener = TcpListener::bind(&opt.bind).await.unwrap();
+    let listener = TcpListener::bind(opt.bind).unwrap();
+    listener.set_nonblocking(true).unwrap();
 
     println!("listening on {}", listener.local_addr().unwrap());
+
+    if opt.daemon {
+        // SAFETY: the tokio runtime has not started yet, we are the only thread
+        unsafe {
+            daemonize();
+        }
+    }
+
+    run(&opt, &acceptor, listener);
+}
+
+#[tokio::main]
+async fn run(opt: &Opt, acceptor: &TlsAcceptor, listener: TcpListener) {
+    let zip = ZipFileReader::new(&opt.zip)
+        .await
+        .expect("failed to open zip");
+    let srv = Arc::new(server::Server::from_zip(zip));
+    let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 
     loop {
         let (sock, _addr) = listener.accept().await.unwrap();
