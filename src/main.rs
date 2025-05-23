@@ -49,9 +49,7 @@ struct Opt {
 }
 
 /// # Safety
-/// if used while multiple threads exist, only c "async-signal-safe" functions may be used until
-/// the next exec to avoid invoking c undefined behavior. using this with multiple threads is
-/// pretty pointless, consider not doing it.
+/// must not be used when multiple threads exist
 ///
 /// forking also messes with quite a few little things that may break rust's safety guarantees,
 /// see `fork(2)` for an exhaustive list.
@@ -59,7 +57,18 @@ unsafe fn daemonize() {
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
     match unsafe { libc::fork() } {
-        0 => (),
+        0 => {
+            for n in 0..3 {
+                // SAFETY: assuming there are no other threads that might be using them right now,
+                // swapping out std{in,out,err} with /dev/null should be fine
+                unsafe {
+                    libc::close(n);
+                    if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) == -1 {
+                        libc::abort();
+                    }
+                }
+            }
+        }
         1.. => std::process::exit(0),
         -1 => panic!("failed to fork"),
         _ => unreachable!(),
@@ -85,6 +94,7 @@ fn main() {
     println!("listening on {}", listener.local_addr().unwrap());
 
     if opt.daemon {
+        eprintln!("forking to background, further errors will be eaten.");
         // SAFETY: the tokio runtime has not started yet, we are the only thread
         unsafe {
             daemonize();
