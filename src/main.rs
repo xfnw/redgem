@@ -54,6 +54,11 @@ struct Opt {
 /// forking also messes with quite a few little things that may break rust's safety guarantees,
 /// see `fork(2)` for an exhaustive list.
 unsafe fn daemonize() {
+    assert!(
+        std::fs::metadata("/dev/null").is_ok(),
+        "daemonization requires /dev/null"
+    );
+
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
     match unsafe { libc::fork() } {
