@@ -63,7 +63,7 @@ unsafe fn daemonize() {
                 // swapping out std{in,out,err} with /dev/null should be fine
                 unsafe {
                     libc::close(n);
-                    if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) == -1 {
+                    if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) != n {
                         libc::abort();
                     }
                 }
