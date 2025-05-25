@@ -54,24 +54,24 @@ struct Opt {
 /// forking also messes with quite a few little things that may break rust's safety guarantees,
 /// see `fork(2)` for an exhaustive list.
 unsafe fn daemonize() {
-    assert!(
-        std::fs::metadata("/dev/null").is_ok(),
-        "daemonization requires /dev/null"
-    );
-
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
     match unsafe { libc::fork() } {
         0 => {
-            for n in 0..3 {
-                // SAFETY: assuming there are no other threads that might be using them right now,
-                // swapping out std{in,out,err} with /dev/null should be fine
-                unsafe {
-                    libc::close(n);
-                    if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) != n {
-                        libc::abort();
+            if std::fs::metadata("/dev/null").is_ok() {
+                eprintln!("forked into background, further errors will be eaten.");
+                for n in 0..3 {
+                    // SAFETY: assuming there are no other threads that might be using them right now,
+                    // swapping out std{in,out,err} with /dev/null should be fine
+                    unsafe {
+                        libc::close(n);
+                        if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) != n {
+                            libc::abort();
+                        }
                     }
                 }
+            } else {
+                eprintln!("forked into background without closing standard streams.");
             }
         }
         1.. => std::process::exit(0),
@@ -99,7 +99,6 @@ fn main() {
     println!("listening on {}", listener.local_addr().unwrap());
 
     if opt.daemon {
-        eprintln!("forking to background, further errors will be eaten.");
         // SAFETY: the tokio runtime has not started yet, we are the only thread
         unsafe {
             daemonize();
