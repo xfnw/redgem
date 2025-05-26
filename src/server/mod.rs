@@ -85,7 +85,10 @@ impl Server {
         else {
             _ = timeout(
                 Duration::from_secs(30),
-                send_response::<&[u8]>(stream, Error::Timeout.into()),
+                send_response::<Compat<ZipEntryReader<'_, Compat<BufReader<File>>, WithEntry<'_>>>>(
+                    stream,
+                    Error::Timeout.into(),
+                ),
             )
             .await;
             return;
