@@ -33,9 +33,8 @@ struct Opt {
     daemon: bool,
     /// zip file to serve files from.
     ///
-    /// defaults to the current binary in procfs, serving files from a
-    /// zip file concatenated with itself
-    #[argh(option, default = "\"/proc/self/exe\".parse().unwrap()")]
+    /// defaults to the current binary, serving files from a zip file concatenated with itself
+    #[argh(option, default = "path_self().expect(\"set the --zip option\")")]
     zip: PathBuf,
     /// path to your tls certificate
     #[argh(positional)]
@@ -78,6 +77,42 @@ unsafe fn daemonize() {
         -1 => panic!("failed to fork"),
         _ => unreachable!(),
     }
+}
+
+/// find the current executable
+///
+/// this differs from [`std::env::current_exe`] in that symlinks are returned instead of the target
+/// on platforms that have procfs, since these links do not always target actual filesystem paths
+fn path_self() -> Option<PathBuf> {
+    macro_rules! search_proc {
+        ($($proc:literal),*) => {
+            $(
+                if std::fs::metadata($proc).is_ok() {
+                    return Some($proc.into());
+                }
+            )*
+        }
+    }
+
+    search_proc!(
+        "/proc/self/exe",
+        "/proc/curproc/exe",
+        "/proc/self/path/a.out"
+    );
+
+    // fallback to [`std::env::current_exe`] since some platforms do not just read a procfs link
+    // skip platforms that only read args, since we do that next
+    #[cfg(not(any(target_os = "aix", target_os = "vxworks", target_os = "fuchsia")))]
+    if let Ok(path) = std::env::current_exe() {
+        return Some(path);
+    }
+
+    let path = PathBuf::from(std::env::args().next()?);
+    if path.exists() {
+        return Some(path);
+    }
+
+    None
 }
 
 fn main() {
