@@ -1,4 +1,5 @@
 #![deny(clippy::pedantic)]
+#![cfg_attr(not(feature = "daemon"), forbid(unsafe_code))]
 
 use argh::FromArgs;
 use async_zip::tokio::read::fs::ZipFileReader;
@@ -29,6 +30,7 @@ struct Opt {
     #[argh(option, default = "\"[::]:1965\".parse().unwrap()")]
     bind: SocketAddr,
     /// fork into background after starting
+    #[cfg(feature = "daemon")]
     #[argh(switch)]
     daemon: bool,
     /// zip file to serve files from.
@@ -52,6 +54,7 @@ struct Opt {
 ///
 /// forking also messes with quite a few little things that may break rust's safety guarantees,
 /// see `fork(2)` for an exhaustive list.
+#[cfg(feature = "daemon")]
 unsafe fn daemonize() {
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
@@ -133,6 +136,7 @@ fn main() {
 
     println!("listening on {}", listener.local_addr().unwrap());
 
+    #[cfg(feature = "daemon")]
     if opt.daemon {
         // SAFETY: the tokio runtime has not started yet, we are the only thread
         unsafe {

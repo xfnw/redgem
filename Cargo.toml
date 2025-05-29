@@ -9,19 +9,20 @@ argh = { version = "0.1.13", default-features = false, features = ["help"] }
 async_zip = { version = "0.0.17", features = ["tokio-fs"] }
 fluent-uri = "0.3.2"
 foxerror = "0.1.1"
-libc = "0.2.172"
+libc = { version = "0.2.172", optional = true }
 pin-project-lite = "0.2.16"
 tokio = { version = "1.45", features = ["rt-multi-thread", "net", "macros", "io-util", "fs", "time"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 tokio-util = { version = "0.7.15", features = ["compat"] }
 
 [features]
-default = ["deflate", "tls12"]
+default = ["deflate", "tls12", "daemon"]
 bzip2 = ["async_zip/bzip2"]
 deflate = ["async_zip/deflate"]
 xz = ["async_zip/xz"]
 zstd = ["async_zip/zstd"]
 tls12 = ["tokio-rustls/tls12"]
+daemon = ["dep:libc"]
 
 [profile.smol]
 inherits = "release"
