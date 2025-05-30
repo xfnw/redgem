@@ -40,7 +40,30 @@ impl Request {
 
 #[cfg(test)]
 mod tests {
-    use super::Request;
+    use super::{Error, Request};
+
+    macro_rules! all_err {
+        (($($req:literal),*), $err:expr) => {
+            $(
+                assert_eq!(Request::parse($req).unwrap_err(), $err);
+            )*
+        }
+    }
+
+    #[test]
+    fn no_newlines() {
+        all_err!(
+            (
+                b"gem\rini://example.com/meow",
+                b"gem\nini://example.com/meow",
+                b"gemini://exam\rple.com/meow",
+                b"gemini://exam\nple.com/meow",
+                b"gemini://example.com/me\row",
+                b"gemini://example.com/me\now"
+            ),
+            Error::UnparseableUri
+        );
+    }
 
     #[test]
     fn parse_pathname() {
