@@ -49,6 +49,8 @@ struct Opt {
     key: Option<PathBuf>,
 }
 
+/// fork into background
+///
 /// # Safety
 /// must not be used when multiple threads exist
 ///

@@ -140,6 +140,7 @@ impl Server {
     }
 }
 
+/// send a [`response::Response`] and then close the connection with `close_notify`
 async fn send_response<R>(mut stream: TlsStream<TcpStream>, response: response::Response<R>)
 where
     R: AsyncRead + Unpin,

@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll, ready},
 };
 
+/// the file type for a successful [`Response`]
 #[derive(Debug)]
 pub struct MimeType {
     domtype: &'static str,
@@ -16,6 +17,7 @@ pub struct MimeType {
 }
 
 impl MimeType {
+    /// guess the type using a file extension
     pub fn from_extension(ext: Option<&OsStr>) -> Self {
         let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
             Some("c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "hxx" | "rs") => ("text", "x-c"),
@@ -68,6 +70,7 @@ impl MimeType {
     }
 }
 
+/// a gemini protocol response
 #[non_exhaustive]
 pub enum Response<B> {
     Success { mimetype: MimeType, body: B },
@@ -75,10 +78,12 @@ pub enum Response<B> {
 }
 
 impl<B> Response<B> {
+    /// create a successful response
     pub const fn with_type(mimetype: MimeType, body: B) -> Self {
         Self::Success { mimetype, body }
     }
 
+    /// turn the response into a tokio [`AsyncRead`]
     pub fn into_read(self) -> OptionalChain<Cursor<Vec<u8>>, B> {
         match self {
             Self::Success { mimetype, body } => {

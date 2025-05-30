@@ -1,10 +1,14 @@
 use super::Error;
 use fluent_uri::{Uri, component::Scheme, encoding::Decode};
 
+/// a parsed gemini request
 #[derive(Debug)]
 pub struct Request(Uri<String>);
 
 impl Request {
+    /// parse a gemini request from bytes
+    ///
+    /// this expects line endings to already have been removed
     pub fn parse(inp: &[u8]) -> Result<Self, Error> {
         let u = Uri::parse(str::from_utf8(inp)?.to_string()).map_err(|_| Error::UnparseableUri)?;
 
@@ -27,6 +31,7 @@ impl Request {
         Ok(Self(u))
     }
 
+    /// get the path from a request
     #[inline]
     pub fn pathname(&self) -> Decode<'_> {
         self.0.path().decode()
