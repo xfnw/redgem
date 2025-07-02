@@ -19,7 +19,11 @@ pub struct MimeType {
 impl MimeType {
     /// guess the type using a file extension
     pub fn from_extension(ext: Option<&OsStr>) -> Self {
-        let (domtype, subtype) = match ext.and_then(OsStr::to_str) {
+        let (domtype, subtype) = match ext
+            .and_then(OsStr::to_str)
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
             Some("c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "hxx" | "rs") => ("text", "x-c"),
             Some("css") => ("text", "css"),
             Some("csv") => ("text", "csv"),
