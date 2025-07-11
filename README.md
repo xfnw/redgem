@@ -1,5 +1,5 @@
 # redgem
-a zipapp gemini server
+a gemini server served from a zip file
 
 ## building
 redgem can be built with cargo
@@ -14,9 +14,9 @@ can be toggled, a list of them is in `Cargo.toml`
 [cross]: https://github.com/cross-rs/cross
 [zigbuild]: https://github.com/rust-cross/cargo-zigbuild
 
-turning it into a zipapp is as simple as concatenating a zip of the
-files you want to serve with the redgem binary, setting it executable,
-and correcting the zip offsets
+turning it into an executable zip is as simple as concatenating a zip
+of the files you want to serve with the redgem binary, setting it
+executable, and correcting the zip offsets
 ```
 cat target/release/redgem src/tests/test.zip > redgem.zip
 chmod +x redgem.zip

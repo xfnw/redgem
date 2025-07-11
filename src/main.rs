@@ -22,7 +22,7 @@ mod server;
 #[cfg(test)]
 mod tests;
 
-/// a zipapp gemini server
+/// a gemini server served from a zip file
 #[derive(Debug, FromArgs)]
 #[argh(help_triggers("--help"))]
 struct Opt {
