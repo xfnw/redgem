@@ -6,12 +6,13 @@ redgem can be built with cargo
 ```
 cargo build -r
 ```
-optionally, cross compiling with [cross] to a musl target and
-`--profile smol` can be used to get a more portable (static) and
-smaller binary. there are also some features that can be toggled,
-a list of them is in `Cargo.toml`
+optionally, cross compiling with [cross] or [zigbuild] to a musl
+target and `--profile smol` can be used to get a more portable
+(static) and smaller binary. there are also some features that
+can be toggled, a list of them is in `Cargo.toml`
 
 [cross]: https://github.com/cross-rs/cross
+[zigbuild]: https://github.com/rust-cross/cargo-zigbuild
 
 turning it into a zipapp is as simple as concatenating a zip of the
 files you want to serve with the redgem binary, setting it executable,
