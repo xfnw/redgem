@@ -29,7 +29,7 @@ can be created with with openssl
 ```
 openssl req -x509 -newkey rsa:4096 -days 3650 -noenc \
  -keyout gemini.pem -out gemini.pem -subj "/CN=example.com" \
- -addext "subjectAltName = DNS:example.com, IP:127.0.0.1, IP:::1" \
+ -addext "subjectAltName = DNS:example.com" \
  -addext basicConstraints=critical,CA:FALSE
 ```
 if you do not care about users of older tls libraries, `ed25519`
