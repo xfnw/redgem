@@ -122,6 +122,10 @@ fn path_self() -> Option<PathBuf> {
 
 fn main() {
     let opt: Opt = argh::from_env();
+    let zip = {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async { ZipFileReader::new(&opt.zip).await.expect("open zip") })
+    };
     let cert = CertificateDer::pem_file_iter(&opt.cert)
         .expect("could not open certificate")
         .collect::<Result<Vec<_>, _>>()
@@ -140,20 +144,18 @@ fn main() {
 
     #[cfg(feature = "daemon")]
     if opt.daemon {
-        // SAFETY: the tokio runtime has not started yet, we are the only thread
+        // SAFETY: the first tokio runtime has already been dropped and the new tokio runtime has
+        // not started yet, we should be the only thread
         unsafe {
             daemonize();
         }
     }
 
-    run(&opt, &acceptor, listener);
+    run(zip, &acceptor, listener);
 }
 
 #[tokio::main]
-async fn run(opt: &Opt, acceptor: &TlsAcceptor, listener: TcpListener) {
-    let zip = ZipFileReader::new(&opt.zip)
-        .await
-        .expect("failed to open zip");
+async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: TcpListener) {
     let srv = Arc::new(server::Server::from_zip(zip));
     let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 

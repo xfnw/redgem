@@ -138,3 +138,22 @@ async fn no_shutdown() {
     let addr = serve_tls(|_| Box::pin(async {})).await;
     assert!(request(addr, b"gemini://localhost/\r\n").await.is_err());
 }
+
+/// make sure [`async_zip`] is fine with the runtime being switched out
+#[test]
+fn zip_swap_runtime() {
+    let zip = {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let zip = runtime.block_on(async { ZipFileReader::new(ZIP_PATH).await.unwrap() });
+        assert_eq!(runtime.metrics().num_alive_tasks(), 0);
+        zip
+    };
+
+    let newruntime = tokio::runtime::Runtime::new().unwrap();
+    newruntime.block_on(async move {
+        let mut entry = zip.reader_with_entry(0).await.unwrap();
+        let mut out = String::new();
+        entry.read_to_string_checked(&mut out).await.unwrap();
+        assert_eq!(out, "hewwo world\n");
+    });
+}
