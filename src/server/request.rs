@@ -36,6 +36,28 @@ impl Request {
     pub fn pathname(&self) -> Decode<'_> {
         self.0.path().decode()
     }
+
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    /// create a new request with a `/` added to the end of the path.
+    ///
+    /// the result will be nonsensical if it already has a trailing `/`
+    pub fn with_trailing(&self) -> Result<Self, Error> {
+        let mut path = self.0.path().to_owned();
+        path.push('/');
+
+        let uri = Uri::builder()
+            .scheme(self.0.scheme())
+            .authority(self.0.authority().expect("Request must have authority"))
+            .path(&path)
+            .build()
+            .map_err(|_| Error::UriBuild)?;
+
+        Ok(Self(uri))
+    }
 }
 
 #[cfg(test)]

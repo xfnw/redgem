@@ -34,6 +34,7 @@ enum Error {
     NotFound,
     BadEntry,
     Timeout,
+    UriBuild,
 }
 
 impl Error {
@@ -48,6 +49,7 @@ impl Error {
             Self::NotFound => b"51 not found\r\n",
             Self::BadEntry => b"40 failed to open zip entry\r\n",
             Self::Timeout => b"40 timed out\r\n",
+            Self::UriBuild => b"40 failed to build uri\r\n",
         }
     }
 }
@@ -95,10 +97,7 @@ impl Server {
         };
 
         let response = match request {
-            Ok(request) => {
-                let path = Path::new("/").join(OsStr::from_bytes(request.pathname().as_bytes()));
-                self.get_file(&path).await
-            }
+            Ok(request) => self.get_file(request).await,
             Err(e) => e.into(),
         };
 
@@ -125,12 +124,35 @@ impl Server {
 
     async fn get_file(
         &self,
-        path: &Path,
+        req: request::Request,
     ) -> response::Response<Compat<ZipEntryReader<'_, Compat<BufReader<File>>, WithEntry<'_>>>>
     {
-        let Some(&(id, is_index)) = self.index.get(path) else {
+        let path = req.pathname();
+        let bytes = path.as_bytes();
+        // pretend that an empty path has a trailing / since the spec
+        // forbids redirects between "" and "/"
+        let trailing = bytes.is_empty() || bytes.ends_with(b"/");
+        let path = Path::new("/").join(OsStr::from_bytes(bytes));
+
+        let Some(&(id, is_index)) = self.index.get(&path) else {
             return Error::NotFound.into();
         };
+
+        match (is_index, trailing) {
+            (false, true) => {
+                // trailing / on normal file
+                return Error::NotFound.into();
+            }
+            (true, false) => {
+                // missing trailing / on index
+                return match req.with_trailing() {
+                    Ok(new) => response::Response::permanent_redirect(new),
+                    Err(e) => e.into(),
+                };
+            }
+            (false, false) | (true, true) => (),
+        }
+
         let Ok(entry) = self.zip.reader_with_entry(id).await else {
             return Error::BadEntry.into();
         };

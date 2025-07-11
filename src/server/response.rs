@@ -1,13 +1,12 @@
+use super::{Error, request::Request};
 use pin_project_lite::pin_project;
-use tokio::io::{AsyncRead, ReadBuf};
-
-use super::Error;
 use std::{
     ffi::OsStr,
     io::Cursor,
     pin::Pin,
     task::{Context, Poll, ready},
 };
+use tokio::io::{AsyncRead, ReadBuf};
 
 /// the file type for a successful [`Response`]
 #[derive(Debug)]
@@ -79,12 +78,18 @@ impl MimeType {
 pub enum Response<B> {
     Success { mimetype: MimeType, body: B },
     Failure { kind: Error },
+    PermanentRedirect { to: Request },
 }
 
 impl<B> Response<B> {
     /// create a successful response
     pub const fn with_type(mimetype: MimeType, body: B) -> Self {
         Self::Success { mimetype, body }
+    }
+
+    /// create a permanent redirect response
+    pub const fn permanent_redirect(to: Request) -> Self {
+        Self::PermanentRedirect { to }
     }
 
     /// turn the response into a tokio [`AsyncRead`]
@@ -97,6 +102,12 @@ impl<B> Response<B> {
                 OptionalChain::chain(Cursor::new(header), body)
             }
             Self::Failure { kind } => OptionalChain::single(Cursor::new(kind.bytes().to_vec())),
+            Self::PermanentRedirect { to } => {
+                let mut header = b"31 ".to_vec();
+                header.extend_from_slice(to.as_str().as_bytes());
+                header.extend_from_slice(b"\r\n");
+                OptionalChain::single(Cursor::new(header))
+            }
         }
     }
 }
