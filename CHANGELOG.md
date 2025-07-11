@@ -12,7 +12,7 @@
 ## 1.0.1 - 2025-06-28
 
 ### changes
-- increase response timeout from 5 minutes to 10 minutes
+- response timeout increased from 5 minutes to 10 minutes
 
 ## 1.0.0 - 2025-05-30
 initial release
