@@ -1,6 +1,6 @@
 # changelog
 
-## unreleased
+## 1.0.2 - 2025-07-12
 
 ### fixes
 - file extensions for mime type guessing are now case insensitive
