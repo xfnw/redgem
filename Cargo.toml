@@ -6,7 +6,7 @@ edition = "2024"
 
 [dependencies]
 argh = { version = "0.1.13", default-features = false, features = ["help"] }
-async_zip = { version = "0.0.17", features = ["tokio-fs"] }
+async_zip = { version = "0.0.18", features = ["tokio-fs"] }
 fluent-uri = "0.3.2"
 foxerror = "0.1.1"
 libc = { version = "0.2.172", optional = true }
