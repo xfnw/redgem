@@ -126,7 +126,7 @@ async fn length() {
     long.extend_from_slice(eol);
     assert_eq!(
         request(addr, long.as_slice()).await.unwrap(),
-        b"59 header too long\r\n"
+        b"59 request too long\r\n"
     );
 }
 

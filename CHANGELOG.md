@@ -5,6 +5,8 @@
 ### fixes
 - requests with a query string are now rejected, since redgem does not
   support asking for input
+- failure to read a request will no longer erroneously report that it
+  was too long
 
 ## 1.0.2 - 2025-07-12
 

@@ -23,7 +23,8 @@ mod response;
 
 #[derive(Debug, Eq, PartialEq, foxerror::FoxError)]
 enum Error {
-    HeaderTooLong,
+    RequestTooLong,
+    RequestRead,
     #[err(from)]
     NonUtf8(std::str::Utf8Error),
     UnparseableUri,
@@ -41,7 +42,8 @@ enum Error {
 impl Error {
     const fn bytes(&self) -> &'static [u8] {
         match self {
-            Self::HeaderTooLong => b"59 header too long\r\n",
+            Self::RequestTooLong => b"59 request too long\r\n",
+            Self::RequestRead => b"40 could not read request\r\n",
             Self::NonUtf8(_) | Self::UnparseableUri => b"59 cannot parse url\r\n",
             Self::NonGeminiScheme => b"53 gemini scheme required\r\n",
             Self::NoAuthority => b"59 missing url authority\r\n",
@@ -114,10 +116,11 @@ impl Server {
         let mut len = 0;
 
         loop {
+            if buffer[len..].is_empty() {
+                return Err(Error::RequestTooLong);
+            }
             let Ok(count @ 1..) = stream.read(&mut buffer[len..]).await else {
-                // a read of zero could also indicate end of file,
-                // but that'd still be a bad request anyways
-                return Err(Error::HeaderTooLong);
+                return Err(Error::RequestRead);
             };
             len += count;
             // only checking the end of the buffer for line endings is incorrect line reading,
