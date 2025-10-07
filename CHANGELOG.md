@@ -1,5 +1,11 @@
 # changelog
 
+## unreleased
+
+### fixes
+- requests with a query string are now rejected, since redgem does not
+  support asking for input
+
 ## 1.0.2 - 2025-07-12
 
 ### fixes

@@ -24,6 +24,10 @@ impl Request {
             return Err(Error::NoAuthority);
         }
 
+        if u.has_query() {
+            return Err(Error::HasQuery);
+        }
+
         if u.has_fragment() {
             return Err(Error::HasFragment);
         }
