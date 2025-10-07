@@ -115,9 +115,15 @@ impl Server {
 
         loop {
             let Ok(count @ 1..) = stream.read(&mut buffer[len..]).await else {
+                // a read of zero could also indicate end of file,
+                // but that'd still be a bad request anyways
                 return Err(Error::HeaderTooLong);
             };
             len += count;
+            // only checking the end of the buffer for line endings is incorrect line reading,
+            // however this is fine for gemini since compliant requests are a single line.
+            // doing it this way allows redgem to be a bit more strict about rejecting malformed
+            // requests that have additional content after the line ending
             if let Some(buf) = buffer[..len].strip_suffix(b"\r\n") {
                 return request::Request::parse(buf);
             }

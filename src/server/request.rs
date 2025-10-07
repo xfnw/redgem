@@ -8,7 +8,8 @@ pub struct Request(Uri<String>);
 impl Request {
     /// parse a gemini request from bytes
     ///
-    /// this expects line endings to already have been removed
+    /// this expects the trailing line ending to already have been removed, and will return an
+    /// error if the input contains a line ending
     pub fn parse(inp: &[u8]) -> Result<Self, Error> {
         let u = Uri::parse(str::from_utf8(inp)?.to_string()).map_err(|_| Error::UnparseableUri)?;
 
