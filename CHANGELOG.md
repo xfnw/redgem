@@ -1,6 +1,6 @@
 # changelog
 
-## unreleased
+## 1.0.3 - 2025-10-08
 
 ### fixes
 - requests with a query string are now rejected, since redgem does not
