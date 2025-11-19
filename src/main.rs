@@ -38,6 +38,10 @@ struct Opt {
     /// defaults to the current binary, serving files from a zip file concatenated with itself
     #[argh(option, default = "path_self().expect(\"set the --zip option\")")]
     zip: PathBuf,
+    /// print version and exit
+    #[expect(dead_code)]
+    #[argh(switch)]
+    version: bool,
     /// path to your tls certificate
     #[argh(positional)]
     cert: PathBuf,
@@ -126,8 +130,51 @@ fn path_self() -> Option<PathBuf> {
     None
 }
 
+struct VersionWrapper(Opt);
+
+impl argh::TopLevelCommand for VersionWrapper {}
+
+impl FromArgs for VersionWrapper {
+    fn from_args(command_name: &[&str], args: &[&str]) -> Result<Self, argh::EarlyExit> {
+        if args
+            .iter()
+            .take_while(|&&s| s != "--")
+            .any(|&s| s == "--version")
+        {
+            // kind of inelegant, but i could not think of an easier way to do this...
+            // XXX: keep this up to date with the features in Cargo.toml
+            let features = [
+                #[cfg(feature = "bzip2")]
+                "bzip2",
+                #[cfg(feature = "deflate")]
+                "deflate",
+                #[cfg(feature = "xz")]
+                "xz",
+                #[cfg(feature = "zstd")]
+                "zstd",
+                #[cfg(feature = "tls12")]
+                "tls12",
+                #[cfg(feature = "daemon")]
+                "daemon",
+            ];
+            let output = format!(
+                "{} {}\nfeatures: {}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+                features.join(", ")
+            );
+            return Err(argh::EarlyExit {
+                output,
+                status: Ok(()),
+            });
+        }
+        Opt::from_args(command_name, args).map(Self)
+    }
+}
+
 fn main() {
-    let opt: Opt = argh::from_env();
+    let opt = argh::from_env::<VersionWrapper>().0;
+
     let zip = {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async { ZipFileReader::new(&opt.zip).await.expect("open zip") })
