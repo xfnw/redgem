@@ -49,6 +49,12 @@ struct Opt {
     key: Option<PathBuf>,
 }
 
+#[cfg(feature = "daemon")]
+fn num_threads() -> Result<usize, std::io::Error> {
+    let tasks = std::fs::read_dir("/proc/self/task")?;
+    Ok(tasks.count())
+}
+
 /// fork into background
 ///
 /// # Safety
@@ -144,8 +150,10 @@ fn main() {
 
     #[cfg(feature = "daemon")]
     if opt.daemon {
-        // SAFETY: the first tokio runtime has already been dropped and the new tokio runtime has
+        // the first tokio runtime has already been dropped and the new tokio runtime has
         // not started yet, we should be the only thread
+        assert_eq!(num_threads().expect("procfs is required"), 1);
+        // SAFETY: we just checked that we're the only thread
         unsafe {
             daemonize();
         }
