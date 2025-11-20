@@ -35,7 +35,7 @@ struct Opt {
     daemon: bool,
     /// zip file to serve files from.
     ///
-    /// defaults to the current binary, serving files from a zip file concatenated with itself
+    /// defaults to the current binary, serving files from a zip concatenated with itself
     #[argh(option, default = "path_self().expect(\"set the --zip option\")")]
     zip: PathBuf,
     /// print version and exit
@@ -47,8 +47,7 @@ struct Opt {
     cert: PathBuf,
     /// path to your tls private key.
     ///
-    /// defaults to looking in the same file as your certificate,
-    /// allowing both to be in one file
+    /// defaults to looking in the same file as your certificate
     #[argh(positional)]
     key: Option<PathBuf>,
 }
