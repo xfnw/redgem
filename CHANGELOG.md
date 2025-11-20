@@ -1,5 +1,16 @@
 # changelog
 
+## unreleased
+
+### added
+- support for being dispatched tcp connections over unix domain
+  socket ancillary data has been added. this is gated behind the
+  `recvfd` feature and is intended for use with [calico(1)]
+- a `--version` switch to get the version and enabled features has
+  been added
+
+[calico(1)]: https://git.causal.agency/pounce/about/calico.1
+
 ## 1.0.3 - 2025-10-08
 
 ### fixes
