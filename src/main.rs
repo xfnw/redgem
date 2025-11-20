@@ -1,5 +1,5 @@
 #![deny(clippy::pedantic)]
-#![cfg_attr(not(feature = "daemon"), forbid(unsafe_code))]
+#![cfg_attr(not(any(feature = "daemon", feature = "recvfd")), forbid(unsafe_code))]
 
 use argh::FromArgs;
 use async_zip::tokio::read::fs::ZipFileReader;
@@ -18,6 +18,9 @@ use tokio_rustls::{
     },
 };
 
+#[cfg(feature = "recvfd")]
+use std::os::unix::net::UnixListener;
+
 mod server;
 #[cfg(test)]
 mod tests;
@@ -29,6 +32,10 @@ struct Opt {
     /// address to listen on
     #[argh(option, default = "\"[::]:1965\".parse().unwrap()")]
     bind: SocketAddr,
+    /// unix socket to listen on and receive file descriptors from
+    #[cfg(feature = "recvfd")]
+    #[argh(option)]
+    unix: Option<PathBuf>,
     /// fork into background after starting
     #[cfg(feature = "daemon")]
     #[argh(switch)]
@@ -155,6 +162,8 @@ impl FromArgs for VersionWrapper {
                 "tls12",
                 #[cfg(feature = "daemon")]
                 "daemon",
+                #[cfg(feature = "recvfd")]
+                "recvfd",
             ];
             let output = format!(
                 "{} {}\nfeatures: {}",
@@ -169,6 +178,12 @@ impl FromArgs for VersionWrapper {
         }
         Opt::from_args(command_name, args).map(Self)
     }
+}
+
+enum Listener {
+    Tcp(TcpListener),
+    #[cfg(feature = "recvfd")]
+    Unix(UnixListener),
 }
 
 fn main() {
@@ -189,10 +204,30 @@ fn main() {
         .with_single_cert(cert, key)
         .unwrap();
     let acceptor = TlsAcceptor::from(Arc::new(config));
-    let listener = TcpListener::bind(opt.bind).unwrap();
-    listener.set_nonblocking(true).unwrap();
 
-    println!("listening on {}", listener.local_addr().unwrap());
+    #[cfg(feature = "recvfd")]
+    let listener = if let Some(unix) = opt.unix {
+        use std::os::unix::fs::FileTypeExt;
+
+        // posix does not have a way to do this without being race condition-y :(
+        if let Ok(meta) = std::fs::metadata(&unix)
+            && meta.file_type().is_socket()
+        {
+            _ = std::fs::remove_file(&unix);
+        }
+
+        Listener::Unix(UnixListener::bind(unix).unwrap())
+    } else {
+        Listener::Tcp(TcpListener::bind(opt.bind).unwrap())
+    };
+    #[cfg(not(feature = "recvfd"))]
+    let listener = Listener::Tcp(TcpListener::bind(opt.bind).unwrap());
+
+    match &listener {
+        Listener::Tcp(listener) => println!("listening on {}", listener.local_addr().unwrap()),
+        #[cfg(feature = "recvfd")]
+        Listener::Unix(listener) => println!("listening on {:?}", listener.local_addr().unwrap()),
+    }
 
     #[cfg(feature = "daemon")]
     if opt.daemon {
@@ -209,8 +244,18 @@ fn main() {
 }
 
 #[tokio::main]
-async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: TcpListener) {
+async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: Listener) {
     let srv = Arc::new(server::Server::from_zip(zip));
+
+    match listener {
+        Listener::Tcp(listener) => handle_tcp(srv, acceptor, listener).await,
+        #[cfg(feature = "recvfd")]
+        Listener::Unix(listener) => handle_unix(srv, acceptor, listener).await,
+    }
+}
+
+async fn handle_tcp(srv: Arc<server::Server>, acceptor: &TlsAcceptor, listener: TcpListener) {
+    listener.set_nonblocking(true).unwrap();
     let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 
     loop {
@@ -220,6 +265,52 @@ async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: TcpListener) 
 
         tokio::spawn(async move {
             let Ok(Ok(stream)) = timeout(Duration::from_secs(10), acceptor.accept(sock)).await
+            else {
+                return;
+            };
+
+            srv.handle_connection(stream).await;
+        });
+    }
+}
+
+#[cfg(feature = "recvfd")]
+async fn handle_unix(srv: Arc<server::Server>, acceptor: &TlsAcceptor, listener: UnixListener) {
+    listener.set_nonblocking(true).unwrap();
+    let listener = tokio::net::UnixListener::from_std(listener).unwrap();
+
+    loop {
+        let (sock, _addr) = listener.accept().await.unwrap();
+        let acceptor = acceptor.clone();
+        let srv = srv.clone();
+
+        tokio::spawn(async move {
+            use asyncfd::UnixFdStream;
+            use std::os::fd::FromRawFd;
+            use tokio::io::AsyncReadExt;
+
+            let Ok(sock) = sock.into_std() else {
+                return;
+            };
+            let Ok(mut sock) = UnixFdStream::new(sock, 1) else {
+                return;
+            };
+            // do a throwaway read so that we can get the fd from ancillary data.
+            // calico just sends a null byte here
+            _ = sock.read_u8().await;
+            let Some(fd) = sock.pop_incoming_fd() else {
+                return;
+            };
+            drop(sock);
+            // SAFETY: we just received the fd so we should have exclusive access to it
+            let stream = unsafe { std::net::TcpStream::from_raw_fd(fd) };
+            if stream.set_nonblocking(true).is_err() {
+                return;
+            }
+            let Ok(stream) = tokio::net::TcpStream::from_std(stream) else {
+                return;
+            };
+            let Ok(Ok(stream)) = timeout(Duration::from_secs(10), acceptor.accept(stream)).await
             else {
                 return;
             };
