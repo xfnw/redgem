@@ -143,7 +143,7 @@ impl FromArgs for VersionWrapper {
         {
             // kind of inelegant, but i could not think of an easier way to do this...
             // XXX: keep this up to date with the features in Cargo.toml
-            let features = [
+            let features: &[&str] = &[
                 #[cfg(feature = "bzip2")]
                 "bzip2",
                 #[cfg(feature = "deflate")]
