@@ -231,10 +231,11 @@ fn main() {
 
     #[cfg(feature = "daemon")]
     if opt.daemon {
-        // the first tokio runtime has already been dropped and the new tokio runtime has
+        if let Ok(threads) = num_threads() {
+            assert_eq!(threads, 1);
+        }
+        // SAFETY: the first tokio runtime has already been dropped and the new tokio runtime has
         // not started yet, we should be the only thread
-        assert_eq!(num_threads().expect("procfs is required"), 1);
-        // SAFETY: we just checked that we're the only thread
         unsafe {
             daemonize();
         }
