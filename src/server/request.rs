@@ -10,7 +10,7 @@ impl Request {
     ///
     /// this expects the trailing line ending to already have been removed, and will return an
     /// error if the input contains a line ending
-    pub fn parse(inp: &[u8]) -> Result<Self, Error> {
+    pub fn parse(inp: &[u8], expect_host: Option<&str>) -> Result<Self, Error> {
         let u = Uri::parse(str::from_utf8(inp)?.to_string()).map_err(|_| Error::UnparseableUri)?;
 
         if u.scheme() != const { Scheme::new_or_panic("gemini") } {
@@ -18,6 +18,9 @@ impl Request {
         }
 
         if let Some(authority) = u.authority() {
+            if expect_host.is_some_and(|h| !h.eq_ignore_ascii_case(authority.host())) {
+                return Err(Error::SniMismatch);
+            }
             if authority.has_userinfo() {
                 return Err(Error::Userinfo);
             }
@@ -72,7 +75,7 @@ mod tests {
     macro_rules! all_err {
         (($($req:literal),*), $err:expr) => {
             $(
-                assert_eq!(Request::parse($req).unwrap_err(), $err);
+                assert_eq!(Request::parse($req, None).unwrap_err(), $err);
             )*
         }
     }
@@ -95,11 +98,19 @@ mod tests {
     #[test]
     fn parse_pathname() {
         assert_eq!(
-            Request::parse(b"gemini://example.com/meow")
+            Request::parse(b"gemini://example.com:1234/meow", Some("Example.com"))
                 .unwrap()
                 .pathname()
                 .as_bytes(),
             b"/meow"
+        );
+    }
+
+    #[test]
+    fn bad_host() {
+        assert_eq!(
+            Request::parse(b"gemini://geminiprotocol.net", Some("example.com")).unwrap_err(),
+            Error::SniMismatch
         );
     }
 }

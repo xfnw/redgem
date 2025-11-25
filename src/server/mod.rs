@@ -30,6 +30,7 @@ enum Error {
     UnparseableUri,
     NonGeminiScheme,
     NoAuthority,
+    SniMismatch,
     Userinfo,
     HasQuery,
     HasFragment,
@@ -47,6 +48,7 @@ impl Error {
             Self::NonUtf8(_) | Self::UnparseableUri => b"59 cannot parse url\r\n",
             Self::NonGeminiScheme => b"53 gemini scheme required\r\n",
             Self::NoAuthority => b"59 missing url authority\r\n",
+            Self::SniMismatch => b"53 host does not match sni\r\n",
             Self::Userinfo => b"59 your client leaks url userinfo! please report this\r\n",
             Self::HasQuery => b"50 no input expected, silly\r\n",
             Self::HasFragment => b"59 your client leaks url fragments! please report this\r\n",
@@ -128,7 +130,9 @@ impl Server {
             // doing it this way allows redgem to be a bit more strict about rejecting malformed
             // requests that have additional content after the line ending
             if let Some(buf) = buffer[..len].strip_suffix(b"\r\n") {
-                return request::Request::parse(buf);
+                let tls = stream.get_ref().1;
+                let servername = tls.server_name();
+                return request::Request::parse(buf, servername);
             }
         }
     }

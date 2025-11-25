@@ -11,6 +11,10 @@
 
 [calico(1)]: https://git.causal.agency/pounce/about/calico.1
 
+### fixes
+- when sni is available, requests with an incorrect host not matching
+  sni are now rejected
+
 ## 1.0.3 - 2025-10-08
 
 ### fixes
