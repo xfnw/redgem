@@ -101,7 +101,8 @@ mod tests {
             Request::parse(b"gemini://example.com:1234/meow", Some("Example.com"))
                 .unwrap()
                 .pathname()
-                .to_bytes().as_ref(),
+                .to_bytes()
+                .as_ref(),
             b"/meow"
         );
     }
