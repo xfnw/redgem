@@ -2,6 +2,8 @@
 
 ## unreleased
 
+## 1.1.0 - 2026-01-27
+
 ### added
 - support for being dispatched tcp connections over unix domain
   socket ancillary data has been added. this is gated behind the
