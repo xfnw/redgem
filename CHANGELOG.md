@@ -11,13 +11,13 @@
 
 [calico(1)]: https://git.causal.agency/pounce/about/calico.1
 
-### fixes
+### fixed
 - when sni is available, requests with an incorrect host not matching
   sni are now rejected
 
 ## 1.0.3 - 2025-10-08
 
-### fixes
+### fixed
 - requests with a query string are now rejected, since redgem does not
   support asking for input
 - failure to read a request will no longer erroneously report that it
@@ -25,7 +25,7 @@
 
 ## 1.0.2 - 2025-07-12
 
-### fixes
+### fixed
 - file extensions for mime type guessing are now case insensitive
 - visiting an index page without a trailing slash will now redirect,
   and visiting normal files with a trailing slash is no longer
@@ -34,7 +34,7 @@
 
 ## 1.0.1 - 2025-06-28
 
-### changes
+### changed
 - response timeout increased from 5 minutes to 10 minutes
 
 ## 1.0.0 - 2025-05-30
