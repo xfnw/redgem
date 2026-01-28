@@ -1,5 +1,5 @@
 use super::Error;
-use fluent_uri::{Uri, component::Scheme, encoding::Decode};
+use fluent_uri::{Uri, component::Scheme, pct_enc::Decode};
 
 /// a parsed gemini request
 #[derive(Debug)]
@@ -101,7 +101,7 @@ mod tests {
             Request::parse(b"gemini://example.com:1234/meow", Some("Example.com"))
                 .unwrap()
                 .pathname()
-                .as_bytes(),
+                .to_bytes().as_ref(),
             b"/meow"
         );
     }

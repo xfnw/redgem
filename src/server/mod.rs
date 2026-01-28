@@ -143,11 +143,11 @@ impl Server {
     ) -> response::Response<Compat<ZipEntryReader<'_, Compat<BufReader<File>>, WithEntry<'_>>>>
     {
         let path = req.pathname();
-        let bytes = path.as_bytes();
+        let bytes = path.to_bytes();
         // pretend that an empty path has a trailing / since the spec
         // forbids redirects between "" and "/"
         let trailing = bytes.is_empty() || bytes.ends_with(b"/");
-        let path = Path::new("/").join(OsStr::from_bytes(bytes));
+        let path = Path::new("/").join(OsStr::from_bytes(&bytes));
 
         let Some(&(id, is_index)) = self.index.get(&path) else {
             return Error::NotFound.into();
