@@ -107,7 +107,7 @@ impl Server {
             Err(e) => e.into(),
         };
 
-        _ = timeout(Duration::from_secs(600), send_response(stream, response)).await;
+        _ = timeout(Duration::from_mins(10), send_response(stream, response)).await;
     }
 
     async fn parse_req(
