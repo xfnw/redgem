@@ -187,6 +187,19 @@ enum Listener {
     Unix(UnixListener),
 }
 
+macro_rules! ear {
+    ($exp:expr, $fmt:expr, $exit:expr $(, $($extra:tt)*)?) => {
+        match $exp {
+            Ok(o) => o,
+            Err(e) => {
+                eprint!($fmt $(, $($extra)*)?);
+                eprintln!(": {e}");
+                return ExitCode::from($exit);
+            }
+        }
+    };
+}
+
 fn main() -> ExitCode {
     let opt = argh::from_env::<VersionWrapper>().0;
 
@@ -196,37 +209,27 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         };
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        #[expect(clippy::unnecessary_debug_formatting)]
-        match runtime.block_on(async { ZipFileReader::new(&zip_path).await }) {
-            Ok(z) => z,
-            Err(e) => {
-                eprintln!("could not open zip at {zip_path:?}: {e}");
-                return ExitCode::from(2);
-            }
-        }
+        ear!(
+            runtime.block_on(async { ZipFileReader::new(&zip_path).await }),
+            "could not open zip at {zip_path:?}",
+            2
+        )
     };
-    let cert = match match CertificateDer::pem_file_iter(&opt.cert) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("could not open certificate: {e}");
-            return ExitCode::from(3);
-        }
-    }
-    .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("could not parse certificate: {e}");
-            return ExitCode::from(3);
-        }
-    };
-    let key = match PrivateKeyDer::from_pem_file(opt.key.as_ref().unwrap_or(&opt.cert)) {
-        Ok(k) => k,
-        Err(e) => {
-            eprintln!("could not open private key: {e}");
-            return ExitCode::from(4);
-        }
-    };
+    let cert = ear!(
+        ear!(
+            CertificateDer::pem_file_iter(&opt.cert),
+            "could not open certificate",
+            3
+        )
+        .collect::<Result<Vec<_>, _>>(),
+        "could not parse certificate",
+        3
+    );
+    let key = ear!(
+        PrivateKeyDer::from_pem_file(opt.key.as_ref().unwrap_or(&opt.cert)),
+        "could not open private key",
+        4
+    );
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(cert, key)
@@ -244,30 +247,24 @@ fn main() -> ExitCode {
             _ = std::fs::remove_file(&unix);
         }
 
-        Listener::Unix(match UnixListener::bind(unix) {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("could not bind unix socket: {e}");
-                return ExitCode::from(5);
-            }
-        })
+        Listener::Unix(ear!(
+            UnixListener::bind(unix),
+            "could not bind unix socket",
+            5
+        ))
     } else {
-        Listener::Tcp(match TcpListener::bind(opt.bind) {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("could not bind tcp listener: {e}");
-                return ExitCode::from(5);
-            }
-        })
+        Listener::Tcp(ear!(
+            TcpListener::bind(opt.bind),
+            "could not bind tcp listener",
+            5
+        ))
     };
     #[cfg(not(feature = "recvfd"))]
-    let listener = Listener::Tcp(match TcpListener::bind(opt.bind) {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("could not bind tcp listener: {e}");
-            return ExitCode::from(5);
-        }
-    });
+    let listener = Listener::Tcp(ear!(
+        TcpListener::bind(opt.bind),
+        "could not bind tcp listener",
+        5
+    ));
 
     match &listener {
         Listener::Tcp(listener) => println!("listening on {}", listener.local_addr().unwrap()),
@@ -310,13 +307,7 @@ async fn handle_tcp(
     let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 
     loop {
-        let (sock, _addr) = match listener.accept().await {
-            Ok(a) => a,
-            Err(e) => {
-                eprintln!("failed to accept: {e}");
-                return ExitCode::from(6);
-            }
-        };
+        let (sock, _addr) = ear!(listener.accept().await, "failed to accept", 6);
         let acceptor = acceptor.clone();
         let srv = srv.clone();
 
@@ -341,13 +332,7 @@ async fn handle_unix(
     let listener = tokio::net::UnixListener::from_std(listener).unwrap();
 
     loop {
-        let (sock, _addr) = match listener.accept().await {
-            Ok(a) => a,
-            Err(e) => {
-                eprintln!("failed to accept: {e}");
-                return ExitCode::from(6);
-            }
-        };
+        let (sock, _addr) = ear!(listener.accept().await, "failed to accept", 6);
         let acceptor = acceptor.clone();
         let srv = srv.clone();
 
