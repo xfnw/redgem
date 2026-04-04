@@ -70,13 +70,13 @@ impl Server {
         let mut index = BTreeMap::new();
 
         for (i, entry) in zip.file().entries().iter().enumerate() {
-            if entry.dir().unwrap() {
+            let path = entry.filename().as_bytes();
+            if let Some(b'/') = path.iter().last() {
                 continue;
             }
+            let path = Path::new("/").join(OsStr::from_bytes(path));
 
-            let path = Path::new("/").join(OsStr::from_bytes(entry.filename().as_bytes()));
-
-            if let Some("index.gmi") = path.file_name().and_then(OsStr::to_str) {
+            if let Some(b"index.gmi") = path.file_name().map(OsStr::as_bytes) {
                 let mut newpath = path.clone();
                 newpath.pop();
                 index.insert(newpath, (i, true));

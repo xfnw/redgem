@@ -2,6 +2,9 @@
 
 ## unreleased
 
+### fixed
+- non-UTF-8 filenames in zip files will no longer result in a panic
+
 ## 1.1.0 - 2026-01-27
 
 ### added
