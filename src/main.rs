@@ -6,6 +6,7 @@ use async_zip::tokio::read::fs::ZipFileReader;
 use std::{
     net::{SocketAddr, TcpListener},
     path::PathBuf,
+    process::ExitCode,
     sync::Arc,
     time::Duration,
 };
@@ -186,19 +187,42 @@ enum Listener {
     Unix(UnixListener),
 }
 
-fn main() {
+fn main() -> ExitCode {
     let opt = argh::from_env::<VersionWrapper>().0;
 
     let zip = {
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime.block_on(async { ZipFileReader::new(&opt.zip).await.expect("open zip") })
+        #[expect(clippy::unnecessary_debug_formatting)]
+        match runtime.block_on(async { ZipFileReader::new(&opt.zip).await }) {
+            Ok(z) => z,
+            Err(e) => {
+                eprintln!("could not open zip at {:?}: {e}", opt.zip);
+                return ExitCode::from(2);
+            }
+        }
     };
-    let cert = CertificateDer::pem_file_iter(&opt.cert)
-        .expect("could not open certificate")
-        .collect::<Result<Vec<_>, _>>()
-        .expect("could not parse certificate");
-    let key = PrivateKeyDer::from_pem_file(opt.key.as_ref().unwrap_or(&opt.cert))
-        .expect("could not open private key");
+    let cert = match match CertificateDer::pem_file_iter(&opt.cert) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("could not open certificate: {e}");
+            return ExitCode::from(3);
+        }
+    }
+    .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("could not parse certificate: {e}");
+            return ExitCode::from(3);
+        }
+    };
+    let key = match PrivateKeyDer::from_pem_file(opt.key.as_ref().unwrap_or(&opt.cert)) {
+        Ok(k) => k,
+        Err(e) => {
+            eprintln!("could not open private key: {e}");
+            return ExitCode::from(4);
+        }
+    };
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(cert, key)
@@ -216,12 +240,30 @@ fn main() {
             _ = std::fs::remove_file(&unix);
         }
 
-        Listener::Unix(UnixListener::bind(unix).unwrap())
+        Listener::Unix(match UnixListener::bind(unix) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("could not bind unix socket: {e}");
+                return ExitCode::from(5);
+            }
+        })
     } else {
-        Listener::Tcp(TcpListener::bind(opt.bind).unwrap())
+        Listener::Tcp(match TcpListener::bind(opt.bind) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("could not bind tcp listener: {e}");
+                return ExitCode::from(5);
+            }
+        })
     };
     #[cfg(not(feature = "recvfd"))]
-    let listener = Listener::Tcp(TcpListener::bind(opt.bind).unwrap());
+    let listener = Listener::Tcp(match TcpListener::bind(opt.bind) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("could not bind tcp listener: {e}");
+            return ExitCode::from(5);
+        }
+    });
 
     match &listener {
         Listener::Tcp(listener) => println!("listening on {}", listener.local_addr().unwrap()),
@@ -241,11 +283,11 @@ fn main() {
         }
     }
 
-    run(zip, &acceptor, listener);
+    run(zip, &acceptor, listener)
 }
 
 #[tokio::main]
-async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: Listener) {
+async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: Listener) -> ExitCode {
     let srv = Arc::new(server::Server::from_zip(zip));
 
     match listener {
@@ -255,12 +297,22 @@ async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: Listener) {
     }
 }
 
-async fn handle_tcp(srv: Arc<server::Server>, acceptor: &TlsAcceptor, listener: TcpListener) {
+async fn handle_tcp(
+    srv: Arc<server::Server>,
+    acceptor: &TlsAcceptor,
+    listener: TcpListener,
+) -> ExitCode {
     listener.set_nonblocking(true).unwrap();
     let listener = tokio::net::TcpListener::from_std(listener).unwrap();
 
     loop {
-        let (sock, _addr) = listener.accept().await.unwrap();
+        let (sock, _addr) = match listener.accept().await {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("failed to accept: {e}");
+                return ExitCode::from(6);
+            }
+        };
         let acceptor = acceptor.clone();
         let srv = srv.clone();
 
@@ -276,12 +328,22 @@ async fn handle_tcp(srv: Arc<server::Server>, acceptor: &TlsAcceptor, listener: 
 }
 
 #[cfg(feature = "recvfd")]
-async fn handle_unix(srv: Arc<server::Server>, acceptor: &TlsAcceptor, listener: UnixListener) {
+async fn handle_unix(
+    srv: Arc<server::Server>,
+    acceptor: &TlsAcceptor,
+    listener: UnixListener,
+) -> ExitCode {
     listener.set_nonblocking(true).unwrap();
     let listener = tokio::net::UnixListener::from_std(listener).unwrap();
 
     loop {
-        let (sock, _addr) = listener.accept().await.unwrap();
+        let (sock, _addr) = match listener.accept().await {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("failed to accept: {e}");
+                return ExitCode::from(6);
+            }
+        };
         let acceptor = acceptor.clone();
         let srv = srv.clone();
 
