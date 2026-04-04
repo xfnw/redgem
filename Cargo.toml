@@ -29,6 +29,6 @@ recvfd = ["dep:asyncfd"]
 [profile.smol]
 inherits = "release"
 opt-level = "z"
-#panic = "abort"
+panic = "abort"
 strip = true
 lto = true
