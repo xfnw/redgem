@@ -166,12 +166,13 @@ impl FromArgs for VersionWrapper {
                 #[cfg(feature = "recvfd")]
                 "recvfd",
             ];
-            let output = format!(
-                "{} {}\nfeatures: {}",
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-                features.join(", ")
-            );
+            let mut output = format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+            if let Some(info) = option_env!("REDGEM_VERSION_INFO") {
+                output.push('-');
+                output.push_str(info);
+            }
+            output.push_str("\nfeatures: ");
+            output.push_str(&features.join(", "));
             return Err(argh::EarlyExit {
                 output,
                 status: Ok(()),
