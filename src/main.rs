@@ -44,8 +44,8 @@ struct Opt {
     /// zip file to serve files from.
     ///
     /// defaults to the current binary, serving files from a zip concatenated with itself
-    #[argh(option, default = "path_self().expect(\"set the --zip option\")")]
-    zip: PathBuf,
+    #[argh(option)]
+    zip: Option<PathBuf>,
     /// print version and exit
     #[expect(dead_code)]
     #[argh(switch)]
@@ -191,12 +191,16 @@ fn main() -> ExitCode {
     let opt = argh::from_env::<VersionWrapper>().0;
 
     let zip = {
+        let Some(zip_path) = opt.zip.or_else(path_self) else {
+            eprintln!("could not find path to myself. set it with the --zip option");
+            return ExitCode::from(1);
+        };
         let runtime = tokio::runtime::Runtime::new().unwrap();
         #[expect(clippy::unnecessary_debug_formatting)]
-        match runtime.block_on(async { ZipFileReader::new(&opt.zip).await }) {
+        match runtime.block_on(async { ZipFileReader::new(&zip_path).await }) {
             Ok(z) => z,
             Err(e) => {
-                eprintln!("could not open zip at {:?}: {e}", opt.zip);
+                eprintln!("could not open zip at {zip_path:?}: {e}");
                 return ExitCode::from(2);
             }
         }
