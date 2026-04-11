@@ -83,7 +83,8 @@ unsafe fn daemonize() {
                 eprintln!("forked into background, further errors will be eaten.");
                 for n in 0..3 {
                     // SAFETY: assuming there are no other threads that might be using them right now,
-                    // swapping out std{in,out,err} with /dev/null should be fine
+                    // temporarily breaking rust's io safety rules by swapping out std{in,out,err}
+                    // with /dev/null should be fine
                     unsafe {
                         libc::close(n);
                         if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) != n {
@@ -356,7 +357,10 @@ async fn handle_unix(
             }) else {
                 return;
             };
-            // SAFETY: we just received the fd so we should have exclusive access to it
+            // SAFETY: we just received the fd so we should have exclusive access to it.
+            // notably, from_raw_fd has no safety requirement on what kind of fd to give it. this is
+            // good for us, since we could receive pretty much any kind of fd, and we do not have a
+            // convenient way to check that it actually corresponds to a tcp connection
             let stream = unsafe { std::net::TcpStream::from_raw_fd(fd) };
             if stream.set_nonblocking(true).is_err() {
                 return;
