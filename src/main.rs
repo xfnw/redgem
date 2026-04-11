@@ -342,19 +342,20 @@ async fn handle_unix(
             use std::os::fd::FromRawFd;
             use tokio::io::AsyncReadExt;
 
-            let Ok(sock) = sock.into_std() else {
+            let Some(fd) = ({
+                let Ok(sock) = sock.into_std() else {
+                    return;
+                };
+                let Ok(mut sock) = UnixFdStream::new(sock, 1) else {
+                    return;
+                };
+                // do a throwaway read so that we can get the fd from ancillary data.
+                // calico just sends a null byte here
+                _ = sock.read_u8().await;
+                sock.pop_incoming_fd()
+            }) else {
                 return;
             };
-            let Ok(mut sock) = UnixFdStream::new(sock, 1) else {
-                return;
-            };
-            // do a throwaway read so that we can get the fd from ancillary data.
-            // calico just sends a null byte here
-            _ = sock.read_u8().await;
-            let Some(fd) = sock.pop_incoming_fd() else {
-                return;
-            };
-            drop(sock);
             // SAFETY: we just received the fd so we should have exclusive access to it
             let stream = unsafe { std::net::TcpStream::from_raw_fd(fd) };
             if stream.set_nonblocking(true).is_err() {
