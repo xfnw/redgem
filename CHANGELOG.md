@@ -2,6 +2,8 @@
 
 ## unreleased
 
+## 1.1.1 - 2026-04-12
+
 ### fixed
 - non-UTF-8 filenames in zip files will no longer result in a panic
 
