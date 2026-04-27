@@ -74,7 +74,7 @@ fn num_threads() -> Result<usize, std::io::Error> {
 /// forking also messes with quite a few little things that may break rust's safety guarantees,
 /// see `fork(2)` for an exhaustive list.
 #[cfg(feature = "daemon")]
-unsafe fn daemonize() {
+unsafe fn daemonize() -> std::io::Result<()> {
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
     match unsafe { libc::fork() } {
@@ -95,9 +95,10 @@ unsafe fn daemonize() {
             } else {
                 eprintln!("forked into background without closing standard streams.");
             }
+            Ok(())
         }
         1.. => std::process::exit(0),
-        -1 => panic!("failed to fork"),
+        -1 => Err(std::io::Error::last_os_error()),
         _ => unreachable!(),
     }
 }
@@ -279,11 +280,13 @@ fn main() -> ExitCode {
         if let Ok(threads) = num_threads() {
             assert_eq!(threads, 1);
         }
-        // SAFETY: the first tokio runtime has already been dropped and the new tokio runtime has
-        // not started yet, we should be the only thread
-        unsafe {
-            daemonize();
-        }
+        ear!(
+            // SAFETY: the first tokio runtime has already been dropped and the new tokio runtime has
+            // not started yet, we should be the only thread
+            unsafe { daemonize() },
+            "failed to daemonize",
+            5
+        );
     }
 
     run(zip, &acceptor, listener)
