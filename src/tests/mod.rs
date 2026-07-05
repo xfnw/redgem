@@ -130,7 +130,7 @@ async fn length() {
     );
 }
 
-/// make sure rustls' behavior of not sending close_notify when [`TlsStream`] is dropped without
+/// make sure rustls' behavior of not sending `close_notify` when [`TlsStream`] is dropped without
 /// calling shutdown does not change. we need to not send it if we timeout before the client
 /// consumes the whole response, to signify that the response has been truncated
 #[tokio::test]
