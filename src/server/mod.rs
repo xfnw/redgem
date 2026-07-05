@@ -71,12 +71,16 @@ impl Server {
 
         for (i, entry) in zip.file().entries().iter().enumerate() {
             let path = entry.filename().as_bytes();
-            if let Some(b'/') = path.iter().last() {
+            if path.iter().last().is_some_and(|&b| b == b'/') {
                 continue;
             }
             let path = Path::new("/").join(OsStr::from_bytes(path));
 
-            if let Some(b"index.gmi") = path.file_name().map(OsStr::as_bytes) {
+            if path
+                .file_name()
+                .map(OsStr::as_bytes)
+                .is_some_and(|n| n == b"index.gmi")
+            {
                 let mut newpath = path.clone();
                 newpath.pop();
                 index.insert(newpath, (i, true));
