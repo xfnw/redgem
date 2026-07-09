@@ -75,22 +75,29 @@ fn num_threads() -> Result<usize, std::io::Error> {
 /// see `fork(2)` for an exhaustive list.
 #[cfg(feature = "daemon")]
 unsafe fn daemonize() -> std::io::Result<()> {
+    use std::io::Error;
+
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
     match unsafe { libc::fork() } {
         0 => {
-            // SAFETY: just opening a file does not have safety concerns
+            // SAFETY: opening a file should not have safety concerns
             if let nullfd @ 0.. = unsafe { libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR) }
             {
                 eprintln!("forked into background, further errors will be eaten.");
                 for n in 0..3 {
                     // SAFETY: this does temporarily break rust's io safety rules, but dup2 is
                     // atomic so this is probably fine
-                    unsafe {
-                        if libc::dup2(nullfd, n) != n {
-                            return Err(std::io::Error::last_os_error());
-                        }
+                    if unsafe { libc::dup2(nullfd, n) } != n {
+                        let err = Error::last_os_error();
+                        // SAFETY: we just opened it
+                        _ = unsafe { libc::close(nullfd) };
+                        return Err(err);
                     }
+                }
+                // SAFETY: we just opened it
+                if unsafe { libc::close(nullfd) } != 0 {
+                    return Err(Error::last_os_error());
                 }
             } else {
                 eprintln!("forked into background without closing standard streams.");
@@ -98,7 +105,7 @@ unsafe fn daemonize() -> std::io::Result<()> {
             Ok(())
         }
         1.. => std::process::exit(0),
-        -1 => Err(std::io::Error::last_os_error()),
+        -1 => Err(Error::last_os_error()),
         _ => unreachable!(),
     }
 }
