@@ -2,6 +2,10 @@
 
 ## unreleased
 
+### fixed
+- removing /dev/null while redgem is daemonizing will no longer result
+  in an abort
+
 ## 1.1.1 - 2026-04-12
 
 ### fixed

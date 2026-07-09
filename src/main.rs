@@ -79,16 +79,16 @@ unsafe fn daemonize() -> std::io::Result<()> {
     // but see above doc comment for issues not covered by that
     match unsafe { libc::fork() } {
         0 => {
-            if std::fs::metadata("/dev/null").is_ok() {
+            // SAFETY: just opening a file does not have safety concerns
+            if let nullfd @ 0.. = unsafe { libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR) }
+            {
                 eprintln!("forked into background, further errors will be eaten.");
                 for n in 0..3 {
-                    // SAFETY: assuming there are no other threads that might be using them right now,
-                    // temporarily breaking rust's io safety rules by swapping out std{in,out,err}
-                    // with /dev/null should be fine
+                    // SAFETY: this does temporarily break rust's io safety rules, but dup2 is
+                    // atomic so this is probably fine
                     unsafe {
-                        libc::close(n);
-                        if libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR, 0) != n {
-                            libc::abort();
+                        if libc::dup2(nullfd, n) != n {
+                            return Err(std::io::Error::last_os_error());
                         }
                     }
                 }
