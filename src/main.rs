@@ -75,7 +75,7 @@ fn num_threads() -> Result<usize, std::io::Error> {
 /// see `fork(2)` for an exhaustive list.
 #[cfg(feature = "daemon")]
 unsafe fn daemonize() -> std::io::Result<()> {
-    use std::io::Error;
+    use std::{io::Error, os::fd::AsRawFd};
 
     // SAFETY: most safety concerns are alleviated by the parent exiting immediately,
     // but see above doc comment for issues not covered by that
@@ -85,16 +85,22 @@ unsafe fn daemonize() -> std::io::Result<()> {
             if let nullfd @ 0.. = unsafe { libc::open(c"/dev/null".as_ptr().cast(), libc::O_RDWR) }
             {
                 eprintln!("forked into background, further errors will be eaten.");
-                for n in 0..3 {
-                    // SAFETY: this does temporarily break rust's io safety rules, but dup2 is
-                    // atomic so this is probably fine
-                    if unsafe { libc::dup2(nullfd, n) } != n {
-                        let err = Error::last_os_error();
-                        // SAFETY: we just opened it
-                        _ = unsafe { libc::close(nullfd) };
-                        return Err(err);
-                    }
+
+                macro_rules! nullify {
+                    ($($stdio:ident),*) => {$({
+                        let lock = std::io::$stdio().lock();
+                        // SAFETY: dup2 is atomic, the borrowed fd is never in a closed state
+                        if unsafe { libc::dup2(nullfd, lock.as_raw_fd()) } != lock.as_raw_fd() {
+                            let err = Error::last_os_error();
+                            // SAFETY: we just opened it
+                            _ = unsafe { libc::close(nullfd) };
+                            return Err(err);
+                        }
+                    })*};
                 }
+
+                nullify!(stdin, stdout, stderr);
+
                 // SAFETY: we just opened it
                 if unsafe { libc::close(nullfd) } != 0 {
                     return Err(Error::last_os_error());
