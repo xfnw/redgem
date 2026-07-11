@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use async_zip::tokio::read::fs::ZipFileReader;
 use std::{
     net::{Ipv6Addr, SocketAddr},

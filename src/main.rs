@@ -1,4 +1,6 @@
 #![deny(clippy::pedantic)]
+#![deny(clippy::nursery)]
+#![deny(clippy::unwrap_used)]
 #![cfg_attr(not(any(feature = "daemon", feature = "recvfd")), forbid(unsafe_code))]
 
 use argh::FromArgs;
@@ -31,7 +33,10 @@ mod tests;
 #[argh(help_triggers("--help"))]
 struct Opt {
     /// address to listen on
-    #[argh(option, default = "\"[::]:1965\".parse().unwrap()")]
+    #[argh(
+        option,
+        default = "\"[::]:1965\".parse().expect(\"default bind address should be parseable\")"
+    )]
     bind: SocketAddr,
     /// unix socket to listen on and receive file descriptors from
     #[cfg(feature = "recvfd")]
@@ -224,7 +229,7 @@ fn main() -> ExitCode {
             eprintln!("could not find path to myself. set it with the --zip option");
             return ExitCode::from(1);
         };
-        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let runtime = tokio::runtime::Runtime::new().expect("creating tokio runtime");
         ear!(
             runtime.block_on(async { ZipFileReader::new(&zip_path).await }),
             "could not open zip at {zip_path:?}",
@@ -249,7 +254,7 @@ fn main() -> ExitCode {
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(cert, key)
-        .unwrap();
+        .expect("creating rustls server config");
     let acceptor = TlsAcceptor::from(Arc::new(config));
 
     #[cfg(feature = "recvfd")]
@@ -283,9 +288,19 @@ fn main() -> ExitCode {
     ));
 
     match &listener {
-        Listener::Tcp(listener) => println!("listening on {}", listener.local_addr().unwrap()),
+        Listener::Tcp(listener) => println!(
+            "listening on {}",
+            listener
+                .local_addr()
+                .expect("there should be a local addr, we just bound the listener to one")
+        ),
         #[cfg(feature = "recvfd")]
-        Listener::Unix(listener) => println!("listening on {:?}", listener.local_addr().unwrap()),
+        Listener::Unix(listener) => println!(
+            "listening on {:?}",
+            listener
+                .local_addr()
+                .expect("there should be a local addr, we just bound the listener to one")
+        ),
     }
 
     #[cfg(feature = "daemon")]
@@ -321,8 +336,11 @@ async fn handle_tcp(
     acceptor: &TlsAcceptor,
     listener: TcpListener,
 ) -> ExitCode {
-    listener.set_nonblocking(true).unwrap();
-    let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+    listener
+        .set_nonblocking(true)
+        .expect("making listener nonblocking");
+    let listener = tokio::net::TcpListener::from_std(listener)
+        .expect("turning std listener into tokio listener");
 
     loop {
         let (sock, _addr) = ear!(listener.accept().await, "failed to accept", 6);
@@ -346,8 +364,11 @@ async fn handle_unix(
     acceptor: &TlsAcceptor,
     listener: UnixListener,
 ) -> ExitCode {
-    listener.set_nonblocking(true).unwrap();
-    let listener = tokio::net::UnixListener::from_std(listener).unwrap();
+    listener
+        .set_nonblocking(true)
+        .expect("making listener nonblocking");
+    let listener = tokio::net::UnixListener::from_std(listener)
+        .expect("turning std listener into tokio listener");
 
     loop {
         let (sock, _addr) = ear!(listener.accept().await, "failed to accept", 6);
