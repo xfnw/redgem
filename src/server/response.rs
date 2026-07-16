@@ -1,12 +1,12 @@
 use super::{Error, request::Request};
 use pin_project_lite::pin_project;
 use std::{
-    ffi::OsStr,
     io::Cursor,
     pin::Pin,
     task::{Context, Poll, ready},
 };
 use tokio::io::{AsyncRead, ReadBuf};
+use unix_str::UnixStr;
 
 /// the file type for a successful [`Response`]
 #[derive(Debug)]
@@ -17,9 +17,9 @@ pub struct MimeType {
 
 impl MimeType {
     /// guess the type using a file extension
-    pub fn from_extension(ext: Option<&OsStr>) -> Self {
+    pub fn from_extension(ext: Option<&UnixStr>) -> Self {
         let (domtype, subtype) = match ext
-            .and_then(OsStr::to_str)
+            .and_then(UnixStr::to_str)
             .map(str::to_ascii_lowercase)
             .as_deref()
         {

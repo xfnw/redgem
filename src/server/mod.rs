@@ -2,13 +2,7 @@ use async_zip::{
     base::read::{WithEntry, ZipEntryReader},
     tokio::read::fs::ZipFileReader,
 };
-use std::{
-    collections::BTreeMap,
-    ffi::OsStr,
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 use tokio::{
     fs::File,
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader, copy},
@@ -17,6 +11,8 @@ use tokio::{
 };
 use tokio_rustls::server::TlsStream;
 use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
+use unix_path::{Path, PathBuf};
+use unix_str::UnixStr;
 
 mod request;
 mod response;
@@ -74,11 +70,11 @@ impl Server {
             if path.iter().last().is_some_and(|&b| b == b'/') {
                 continue;
             }
-            let path = Path::new("/").join(OsStr::from_bytes(path));
+            let path = Path::new("/").join(UnixStr::from_bytes(path));
 
             if path
                 .file_name()
-                .map(OsStr::as_bytes)
+                .map(UnixStr::as_bytes)
                 .is_some_and(|n| n == b"index.gmi")
             {
                 let mut newpath = path.clone();
@@ -151,7 +147,7 @@ impl Server {
         // pretend that an empty path has a trailing / since the spec
         // forbids redirects between "" and "/"
         let trailing = bytes.is_empty() || bytes.ends_with(b"/");
-        let path = Path::new("/").join(OsStr::from_bytes(&bytes));
+        let path = Path::new("/").join(UnixStr::from_bytes(&bytes));
 
         let Some(&(id, is_index)) = self.index.get(&path) else {
             return Error::NotFound.into();
