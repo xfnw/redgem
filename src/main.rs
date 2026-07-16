@@ -126,6 +126,7 @@ unsafe fn daemonize() -> std::io::Result<()> {
 /// this differs from [`std::env::current_exe`] in that symlinks are returned instead of the target
 /// on platforms that have procfs, since these links do not always target actual filesystem paths
 fn path_self() -> Option<PathBuf> {
+    #[cfg(unix)]
     macro_rules! search_proc {
         ($($proc:literal),*) => {
             $(
@@ -136,6 +137,7 @@ fn path_self() -> Option<PathBuf> {
         }
     }
 
+    #[cfg(unix)]
     search_proc!(
         "/proc/self/exe",
         "/proc/curproc/exe",
