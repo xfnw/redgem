@@ -5,6 +5,11 @@
 ### fixed
 - removing /dev/null while redgem is daemonizing will no longer result
   in an abort
+- rust's cross-platform path types are no longer used for referring to
+  paths in zip files, since zip file names always have unix-like
+  semantics regardless of platform
+- procfs is no longer checked for the current executable on
+  non-unix-like platforms
 
 ## 1.1.1 - 2026-04-12
 
