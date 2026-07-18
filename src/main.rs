@@ -231,7 +231,11 @@ fn main() -> ExitCode {
             eprintln!("could not find path to myself. set it with the --zip option");
             return ExitCode::from(1);
         };
-        let runtime = tokio::runtime::Runtime::new().expect("creating tokio runtime");
+        let runtime = ear!(
+            tokio::runtime::Runtime::new(),
+            "could not start tokio runtime",
+            2
+        );
         ear!(
             runtime.block_on(async { ZipFileReader::new(&zip_path).await }),
             "could not open zip at {zip_path:?}",
