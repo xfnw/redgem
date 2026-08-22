@@ -1,7 +1,6 @@
 #![deny(clippy::pedantic)]
 #![deny(clippy::nursery)]
 #![deny(clippy::unwrap_used)]
-#![cfg_attr(not(any(feature = "daemon", feature = "recvfd")), forbid(unsafe_code))]
 
 use argh::FromArgs;
 use async_zip::tokio::read::fs::ZipFileReader;
@@ -12,7 +11,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::Semaphore, time::timeout};
 use tokio_rustls::{
     TlsAcceptor,
     rustls::{
@@ -119,6 +118,18 @@ unsafe fn daemonize() -> std::io::Result<()> {
         -1 => Err(Error::last_os_error()),
         _ => unreachable!(),
     }
+}
+
+#[cfg(unix)]
+fn get_file_limit() -> Result<u64, std::io::Error> {
+    // SAFETY: struct rlimit only has rlim_t (u64) fields,
+    // zero is valid for integers
+    let mut limits = unsafe { std::mem::zeroed() };
+    // SAFETY: pointer to limits is valid for writes
+    if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &raw mut limits) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(limits.rlim_cur)
 }
 
 /// find the current executable
@@ -309,6 +320,11 @@ fn main() -> ExitCode {
         ),
     }
 
+    let accept_limit = Arc::new(Semaphore::new(cfg_select! {
+        unix => ear!(get_file_limit(), "could not get NOFILE limit", 5).try_into().unwrap_or(usize::MAX),
+        _ => 1024,
+    }));
+
     #[cfg(feature = "daemon")]
     if opt.daemon {
         if let Ok(threads) = num_threads() {
@@ -323,24 +339,31 @@ fn main() -> ExitCode {
         );
     }
 
-    run(zip, &acceptor, listener)
+    run(zip, &acceptor, listener, accept_limit)
 }
 
 #[tokio::main]
-async fn run(zip: ZipFileReader, acceptor: &TlsAcceptor, listener: Listener) -> ExitCode {
+async fn run(
+    zip: ZipFileReader,
+    acceptor: &TlsAcceptor,
+    listener: Listener,
+    accept_limit: Arc<Semaphore>,
+) -> ExitCode {
     let srv = Arc::new(server::Server::from_zip(zip));
 
     match listener {
-        Listener::Tcp(listener) => handle_tcp(srv, acceptor, listener).await,
+        Listener::Tcp(listener) => handle_tcp(srv, acceptor, listener, accept_limit).await,
         #[cfg(feature = "recvfd")]
-        Listener::Unix(listener) => handle_unix(srv, acceptor, listener).await,
+        Listener::Unix(listener) => handle_unix(srv, acceptor, listener, accept_limit).await,
     }
 }
 
+#[expect(clippy::significant_drop_tightening)]
 async fn handle_tcp(
     srv: Arc<server::Server>,
     acceptor: &TlsAcceptor,
     listener: TcpListener,
+    accept_limit: Arc<Semaphore>,
 ) -> ExitCode {
     listener
         .set_nonblocking(true)
@@ -349,11 +372,30 @@ async fn handle_tcp(
         .expect("turning std listener into tokio listener");
 
     loop {
-        let (sock, _addr) = ear!(listener.accept().await, "failed to accept", 6);
+        let permit = accept_limit
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("semaphore should be open");
+        let (sock, _addr) = match listener.accept().await {
+            Ok(a) => a,
+            Err(e) => {
+                if matches!(
+                    e.raw_os_error(),
+                    Some(libc::EMFILE | libc::ENFILE | libc::ENOBUFS | libc::ENOMEM)
+                ) {
+                    permit.forget();
+                    continue;
+                }
+                eprintln!("failed to accept: {e}");
+                return ExitCode::from(6);
+            }
+        };
         let acceptor = acceptor.clone();
         let srv = srv.clone();
 
         tokio::spawn(async move {
+            let _permit = permit;
             let Ok(Ok(stream)) = timeout(Duration::from_secs(10), acceptor.accept(sock)).await
             else {
                 return;
@@ -365,10 +407,12 @@ async fn handle_tcp(
 }
 
 #[cfg(feature = "recvfd")]
+#[expect(clippy::significant_drop_tightening)]
 async fn handle_unix(
     srv: Arc<server::Server>,
     acceptor: &TlsAcceptor,
     listener: UnixListener,
+    accept_limit: Arc<Semaphore>,
 ) -> ExitCode {
     listener
         .set_nonblocking(true)
@@ -377,7 +421,25 @@ async fn handle_unix(
         .expect("turning std listener into tokio listener");
 
     loop {
-        let (sock, _addr) = ear!(listener.accept().await, "failed to accept", 6);
+        let permit = accept_limit
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("semaphore should be open");
+        let (sock, _addr) = match listener.accept().await {
+            Ok(a) => a,
+            Err(e) => {
+                if matches!(
+                    e.raw_os_error(),
+                    Some(libc::EMFILE | libc::ENFILE | libc::ENOBUFS | libc::ENOMEM)
+                ) {
+                    permit.forget();
+                    continue;
+                }
+                eprintln!("failed to accept: {e}");
+                return ExitCode::from(6);
+            }
+        };
         let acceptor = acceptor.clone();
         let srv = srv.clone();
 

@@ -10,6 +10,8 @@
   semantics regardless of platform
 - procfs is no longer checked for the current executable on
   non-unix-like platforms
+- there is now a limit on concurrent connections, instead of crashing
+  upon running out of file descriptors
 
 ## 1.1.1 - 2026-04-12
 
