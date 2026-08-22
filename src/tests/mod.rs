@@ -103,6 +103,31 @@ async fn index() {
 }
 
 #[tokio::test]
+async fn directory() {
+    let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
+    let srv = Arc::new(Server::from_zip(zip));
+    let addr = serve_tls(move |s| {
+        let srv = srv.clone();
+        Box::pin(async move {
+            srv.handle_connection(s).await;
+        })
+    })
+    .await;
+    assert_eq!(
+        request(addr, b"gemini://localhost/directory\r\n")
+            .await
+            .unwrap(),
+        b"31 gemini://localhost/directory/\r\n"
+    );
+    assert_eq!(
+        request(addr, b"gemini://localhost/directory/\r\n")
+            .await
+            .unwrap(),
+        b"20 text/gemini\r\nmeow\n"
+    );
+}
+
+#[tokio::test]
 async fn length() {
     let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
     let srv = Arc::new(Server::from_zip(zip));
@@ -153,7 +178,7 @@ fn zip_swap_runtime() {
 
     let newruntime = tokio::runtime::Runtime::new().unwrap();
     newruntime.block_on(async move {
-        let mut entry = zip.reader_with_entry(0).await.unwrap();
+        let mut entry = zip.reader_with_entry(1).await.unwrap();
         let mut out = String::new();
         entry.read_to_string_checked(&mut out).await.unwrap();
         assert_eq!(out, "hewwo world\n");
