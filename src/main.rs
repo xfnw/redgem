@@ -42,7 +42,7 @@ struct Opt {
     #[argh(option)]
     unix: Option<PathBuf>,
     /// fork into background after starting
-    #[cfg(feature = "daemon")]
+    #[cfg(all(unix, feature = "daemon"))]
     #[argh(switch)]
     daemon: bool,
     /// zip file to serve files from.
@@ -64,7 +64,7 @@ struct Opt {
     key: Option<PathBuf>,
 }
 
-#[cfg(feature = "daemon")]
+#[cfg(all(unix, feature = "daemon"))]
 fn num_threads() -> Result<usize, std::io::Error> {
     let tasks = std::fs::read_dir("/proc/self/task")?;
     Ok(tasks.count())
@@ -77,7 +77,7 @@ fn num_threads() -> Result<usize, std::io::Error> {
 ///
 /// forking also messes with quite a few little things that may break rust's safety guarantees,
 /// see `fork(2)` for an exhaustive list.
-#[cfg(feature = "daemon")]
+#[cfg(all(unix, feature = "daemon"))]
 unsafe fn daemonize() -> std::io::Result<()> {
     use std::{io::Error, os::fd::AsRawFd};
 
@@ -194,8 +194,10 @@ impl FromArgs for VersionWrapper {
                 "zstd",
                 #[cfg(feature = "tls12")]
                 "tls12",
-                #[cfg(feature = "daemon")]
+                #[cfg(all(unix, feature = "daemon"))]
                 "daemon",
+                #[cfg(all(not(unix), feature = "daemon"))]
+                "daemon (ignored)",
                 #[cfg(feature = "recvfd")]
                 "recvfd",
             ];
@@ -325,7 +327,7 @@ fn main() -> ExitCode {
         _ => 1024,
     }));
 
-    #[cfg(feature = "daemon")]
+    #[cfg(all(unix, feature = "daemon"))]
     if opt.daemon {
         if let Ok(threads) = num_threads() {
             assert_eq!(threads, 1);
