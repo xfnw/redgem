@@ -121,10 +121,11 @@ unsafe fn daemonize() -> std::io::Result<()> {
 }
 
 #[cfg(unix)]
-fn get_file_limit() -> Result<u64, std::io::Error> {
-    // SAFETY: struct rlimit only has rlim_t (u64) fields,
-    // zero is valid for integers
-    let mut limits = unsafe { std::mem::zeroed() };
+fn get_file_limit() -> Result<libc::rlim_t, std::io::Error> {
+    let mut limits = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
     // SAFETY: pointer to limits is valid for writes
     if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &raw mut limits) } != 0 {
         return Err(std::io::Error::last_os_error());
