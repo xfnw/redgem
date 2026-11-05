@@ -3,10 +3,13 @@
 #![deny(clippy::unwrap_used)]
 
 use argh::FromArgs;
-use async_zip::base::read1::seek::{ZipArchiveInner, ZipArchiveReader};
+use async_zip::{
+    base::read1::seek::{ZipArchiveInner, ZipArchiveReader},
+    error::ZipError,
+};
 use std::{
     net::{SocketAddr, TcpListener},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitCode,
     sync::Arc,
     time::Duration,
@@ -19,7 +22,7 @@ use tokio_rustls::{
         pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
     },
 };
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use tokio_util::compat::{Compat, TokioAsyncReadCompatExt};
 
 #[cfg(feature = "recvfd")]
 use std::os::unix::net::UnixListener;
@@ -238,7 +241,6 @@ macro_rules! ear {
     };
 }
 
-#[expect(clippy::too_many_lines)]
 fn main() -> ExitCode {
     let opt = argh::from_env::<VersionWrapper>().0;
 
@@ -252,15 +254,9 @@ fn main() -> ExitCode {
             "could not start tokio runtime",
             2
         );
-        let zipfile = ear!(
-            runtime.block_on(File::open(&zip_path)),
-            "could not open zip at {zip_path:?}",
-            2
-        );
         ear!(
-            runtime
-                .block_on(async { ZipArchiveReader::open(BufReader::new(zipfile).compat()).await }),
-            "could not read zip",
+            runtime.block_on(open_zip(&zip_path)),
+            "could not open zip at {zip_path:?}",
             2
         )
         .inner()
@@ -353,6 +349,15 @@ fn main() -> ExitCode {
     }
 
     run(zip, zip_path, &acceptor, listener, accept_limit)
+}
+
+async fn open_zip<P: AsRef<Path>>(
+    zip_path: P,
+) -> Result<ZipArchiveReader<Compat<BufReader<File>>>, ZipError> {
+    let zipfile = File::open(zip_path)
+        .await
+        .map_err(ZipError::UpstreamReadError)?;
+    ZipArchiveReader::open(BufReader::new(zipfile).compat()).await
 }
 
 #[tokio::main]

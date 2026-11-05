@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
-use async_zip::base::read1::seek::ZipArchiveReader;
+use crate::{open_zip, server::Server};
 use std::{
     net::{Ipv6Addr, SocketAddr},
     path::PathBuf,
@@ -8,8 +8,7 @@ use std::{
     sync::Arc,
 };
 use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncWriteExt, BufReader, copy},
+    io::{AsyncReadExt, AsyncWriteExt, copy},
     net::{TcpListener, TcpStream},
 };
 use tokio_rustls::{
@@ -20,9 +19,7 @@ use tokio_rustls::{
     },
     server::TlsStream,
 };
-use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
-
-use crate::server::Server;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 const CERT_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tests/test.pem");
 const KEY_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tests/test.key");
@@ -86,9 +83,7 @@ async fn request(addr: SocketAddr, req: &[u8]) -> Result<Vec<u8>, std::io::Error
 
 #[tokio::test]
 async fn index() {
-    let zip = ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
-        .await
-        .unwrap();
+    let zip = open_zip(ZIP_PATH).await.unwrap();
     let srv = Arc::new(Server::from_zip(
         zip.inner().clone(),
         PathBuf::from(ZIP_PATH),
@@ -112,9 +107,7 @@ async fn index() {
 
 #[tokio::test]
 async fn directory() {
-    let zip = ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
-        .await
-        .unwrap();
+    let zip = open_zip(ZIP_PATH).await.unwrap();
     let srv = Arc::new(Server::from_zip(
         zip.inner().clone(),
         PathBuf::from(ZIP_PATH),
@@ -142,9 +135,7 @@ async fn directory() {
 
 #[tokio::test]
 async fn length() {
-    let zip = ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
-        .await
-        .unwrap();
+    let zip = open_zip(ZIP_PATH).await.unwrap();
     let srv = Arc::new(Server::from_zip(
         zip.inner().clone(),
         PathBuf::from(ZIP_PATH),
@@ -189,11 +180,7 @@ async fn no_shutdown() {
 fn zip_swap_runtime() {
     let zip = {
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let zip = runtime.block_on(async {
-            ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
-                .await
-                .unwrap()
-        });
+        let zip = runtime.block_on(async { open_zip(ZIP_PATH).await.unwrap() });
         assert_eq!(runtime.metrics().num_alive_tasks(), 0);
         zip
     };
