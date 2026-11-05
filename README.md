@@ -41,9 +41,9 @@ then run the zip file while passing it the certificate
 ```
 
 you can modify the contents later like any other zip file, but try not
-to do that while redgem is running. the zip library it uses re-opens the
-zip file when reading for concurrency reasons, and it'll get confused
-if the contents are different
+to do that while redgem is running. redgem re-opens the zip file when
+reading for concurrency reasons, and it'll get confused if the
+contents are different
 
 ## upgrading
 redgem can be removed from a zip file with `zip -J`. the resulting zip
