@@ -66,8 +66,6 @@ dependencies = [
  "futures-lite",
  "pin-project",
  "thiserror",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]
