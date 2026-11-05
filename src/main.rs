@@ -3,7 +3,7 @@
 #![deny(clippy::unwrap_used)]
 
 use argh::FromArgs;
-use async_zip::tokio::read::fs::ZipFileReader;
+use async_zip::base::read1::seek::{ZipArchiveInner, ZipArchiveReader};
 use std::{
     net::{SocketAddr, TcpListener},
     path::PathBuf,
@@ -11,7 +11,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{sync::Semaphore, time::timeout};
+use tokio::{fs::File, io::BufReader, sync::Semaphore, time::timeout};
 use tokio_rustls::{
     TlsAcceptor,
     rustls::{
@@ -19,6 +19,7 @@ use tokio_rustls::{
         pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
     },
 };
+use tokio_util::compat::TokioAsyncReadCompatExt;
 
 #[cfg(feature = "recvfd")]
 use std::os::unix::net::UnixListener;
@@ -237,24 +238,33 @@ macro_rules! ear {
     };
 }
 
+#[expect(clippy::too_many_lines)]
 fn main() -> ExitCode {
     let opt = argh::from_env::<VersionWrapper>().0;
 
+    let Some(zip_path) = opt.zip.or_else(path_self) else {
+        eprintln!("could not find path to myself. set it with the --zip option");
+        return ExitCode::from(1);
+    };
     let zip = {
-        let Some(zip_path) = opt.zip.or_else(path_self) else {
-            eprintln!("could not find path to myself. set it with the --zip option");
-            return ExitCode::from(1);
-        };
         let runtime = ear!(
             tokio::runtime::Runtime::new(),
             "could not start tokio runtime",
             2
         );
-        ear!(
-            runtime.block_on(async { ZipFileReader::new(&zip_path).await }),
+        let zipfile = ear!(
+            runtime.block_on(File::open(&zip_path)),
             "could not open zip at {zip_path:?}",
             2
+        );
+        ear!(
+            runtime
+                .block_on(async { ZipArchiveReader::open(BufReader::new(zipfile).compat()).await }),
+            "could not read zip",
+            2
         )
+        .inner()
+        .clone()
     };
     let cert = ear!(
         ear!(
@@ -342,17 +352,18 @@ fn main() -> ExitCode {
         );
     }
 
-    run(zip, &acceptor, listener, accept_limit)
+    run(zip, zip_path, &acceptor, listener, accept_limit)
 }
 
 #[tokio::main]
 async fn run(
-    zip: ZipFileReader,
+    zip: Arc<ZipArchiveInner>,
+    zip_path: PathBuf,
     acceptor: &TlsAcceptor,
     listener: Listener,
     accept_limit: Arc<Semaphore>,
 ) -> ExitCode {
-    let srv = Arc::new(server::Server::from_zip(zip));
+    let srv = Arc::new(server::Server::from_zip(zip, zip_path));
 
     match listener {
         Listener::Tcp(listener) => handle_tcp(srv, acceptor, listener, accept_limit).await,

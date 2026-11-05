@@ -1,8 +1,12 @@
-use async_zip::{
-    base::read::{WithEntry, ZipEntryReader},
-    tokio::read::fs::ZipFileReader,
+use async_zip::base::{
+    read::{WithEntry, ZipEntryReader},
+    read1::{
+        ZipFileReader,
+        seek::{ZipArchiveInner, ZipArchiveReader},
+    },
 };
 use std::{collections::BTreeMap, time::Duration};
+use std::{path::PathBuf as NativePathBuf, sync::Arc};
 use tokio::{
     fs::File,
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader, copy},
@@ -10,7 +14,7 @@ use tokio::{
     time::timeout,
 };
 use tokio_rustls::server::TlsStream;
-use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
+use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use unix_path::{Path, PathBuf};
 use unix_str::UnixStr;
 
@@ -34,6 +38,7 @@ enum Error {
     BadEntry,
     Timeout,
     UriBuild,
+    OpenZip,
 }
 
 impl Error {
@@ -52,21 +57,23 @@ impl Error {
             Self::BadEntry => b"40 failed to open zip entry\r\n",
             Self::Timeout => b"40 timed out\r\n",
             Self::UriBuild => b"40 failed to build uri\r\n",
+            Self::OpenZip => b"40 failed to open zip file\r\n",
         }
     }
 }
 
 pub struct Server {
-    zip: ZipFileReader,
+    zip: Arc<ZipArchiveInner>,
+    zip_path: NativePathBuf,
     index: BTreeMap<PathBuf, (usize, bool)>,
 }
 
 impl Server {
-    pub fn from_zip(zip: ZipFileReader) -> Self {
+    pub fn from_zip(zip: Arc<ZipArchiveInner>, zip_path: NativePathBuf) -> Self {
         let mut index = BTreeMap::new();
 
-        for (i, entry) in zip.file().entries().iter().enumerate() {
-            let path = entry.filename().as_bytes();
+        for (i, entry) in zip.cdrs().iter().enumerate() {
+            let path = entry.insecure_file_name.as_bytes();
             if path.iter().last().is_some_and(|&b| b == b'/') {
                 continue;
             }
@@ -85,7 +92,11 @@ impl Server {
             index.insert(path, (i, false));
         }
 
-        Self { zip, index }
+        Self {
+            zip,
+            zip_path,
+            index,
+        }
     }
 
     pub async fn handle_connection(&self, mut stream: TlsStream<TcpStream>) {
@@ -140,8 +151,7 @@ impl Server {
     async fn get_file(
         &self,
         req: request::Request,
-    ) -> response::Response<Compat<ZipEntryReader<'_, Compat<BufReader<File>>, WithEntry<'_>>>>
-    {
+    ) -> response::Response<Compat<ZipFileReader<Compat<BufReader<File>>>>> {
         let path = req.pathname();
         let bytes = path.to_bytes();
         // pretend that an empty path has a trailing / since the spec
@@ -168,7 +178,12 @@ impl Server {
             (false, false) | (true, true) => (),
         }
 
-        let Ok(entry) = self.zip.reader_with_entry(id).await else {
+        let Ok(zipfile) = File::open(&self.zip_path).await else {
+            return Error::OpenZip.into();
+        };
+        let zip =
+            ZipArchiveReader::new_with_inner(BufReader::new(zipfile).compat(), self.zip.clone());
+        let Ok(entry) = zip.file_oneshot(id).await else {
             return Error::BadEntry.into();
         };
         let mimetype =

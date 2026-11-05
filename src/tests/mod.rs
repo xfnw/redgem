@@ -1,13 +1,15 @@
 #![allow(clippy::unwrap_used)]
 
-use async_zip::tokio::read::fs::ZipFileReader;
+use async_zip::base::read1::seek::ZipArchiveReader;
 use std::{
     net::{Ipv6Addr, SocketAddr},
+    path::PathBuf,
     pin::Pin,
     sync::Arc,
 };
 use tokio::{
-    io::{AsyncWriteExt, copy},
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt, BufReader, copy},
     net::{TcpListener, TcpStream},
 };
 use tokio_rustls::{
@@ -18,6 +20,7 @@ use tokio_rustls::{
     },
     server::TlsStream,
 };
+use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 
 use crate::server::Server;
 
@@ -83,8 +86,13 @@ async fn request(addr: SocketAddr, req: &[u8]) -> Result<Vec<u8>, std::io::Error
 
 #[tokio::test]
 async fn index() {
-    let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
-    let srv = Arc::new(Server::from_zip(zip));
+    let zip = ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
+        .await
+        .unwrap();
+    let srv = Arc::new(Server::from_zip(
+        zip.inner().clone(),
+        PathBuf::from(ZIP_PATH),
+    ));
     let addr = serve_tls(move |s| {
         let srv = srv.clone();
         Box::pin(async move {
@@ -104,8 +112,13 @@ async fn index() {
 
 #[tokio::test]
 async fn directory() {
-    let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
-    let srv = Arc::new(Server::from_zip(zip));
+    let zip = ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
+        .await
+        .unwrap();
+    let srv = Arc::new(Server::from_zip(
+        zip.inner().clone(),
+        PathBuf::from(ZIP_PATH),
+    ));
     let addr = serve_tls(move |s| {
         let srv = srv.clone();
         Box::pin(async move {
@@ -129,8 +142,13 @@ async fn directory() {
 
 #[tokio::test]
 async fn length() {
-    let zip = ZipFileReader::new(ZIP_PATH).await.unwrap();
-    let srv = Arc::new(Server::from_zip(zip));
+    let zip = ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
+        .await
+        .unwrap();
+    let srv = Arc::new(Server::from_zip(
+        zip.inner().clone(),
+        PathBuf::from(ZIP_PATH),
+    ));
     let addr = serve_tls(move |s| {
         let srv = srv.clone();
         Box::pin(async move {
@@ -171,16 +189,20 @@ async fn no_shutdown() {
 fn zip_swap_runtime() {
     let zip = {
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let zip = runtime.block_on(async { ZipFileReader::new(ZIP_PATH).await.unwrap() });
+        let zip = runtime.block_on(async {
+            ZipArchiveReader::open(BufReader::new(File::open(ZIP_PATH).await.unwrap()).compat())
+                .await
+                .unwrap()
+        });
         assert_eq!(runtime.metrics().num_alive_tasks(), 0);
         zip
     };
 
     let newruntime = tokio::runtime::Runtime::new().unwrap();
     newruntime.block_on(async move {
-        let mut entry = zip.reader_with_entry(1).await.unwrap();
+        let entry = zip.file_oneshot(1).await.unwrap();
         let mut out = String::new();
-        entry.read_to_string_checked(&mut out).await.unwrap();
+        entry.compat().read_to_string(&mut out).await.unwrap();
         assert_eq!(out, "hewwo world\n");
     });
 }
