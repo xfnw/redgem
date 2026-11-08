@@ -1,0 +1,39 @@
+{
+  "pins": {
+    "crane": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "ipetkov",
+        "repo": "crane"
+      },
+      "branch": "master",
+      "submodules": false,
+      "revision": "79fd63528501446749c09f08cad486a58c7d173e",
+      "url": "https://github.com/ipetkov/crane/archive/79fd63528501446749c09f08cad486a58c7d173e.tar.gz",
+      "hash": "sha256-TREenflwEjxOSq292FYwbc3kEm7TDRtXCZRNWEdjBmg="
+    },
+    "nixpkgs": {
+      "type": "Channel",
+      "name": "nixpkgs-unstable",
+      "artifact": "nixexprs.tar.zst",
+      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1109744.4fe25e12eb9f/nixexprs.tar.zst",
+      "hash": "sha256-4/Yzr1fWTh/zBAR1tR84ZQ1Zhmor8AXwgD4AS7sPn60="
+    },
+    "vulppkgs": {
+      "type": "Git",
+      "repository": {
+        "type": "Forgejo",
+        "server": "https://codeberg.org/",
+        "owner": "xfnw",
+        "repo": "vulppkgs"
+      },
+      "branch": "main",
+      "submodules": false,
+      "revision": "27d8596bfd2a068271044b3097329d1d2f80cf4f",
+      "url": "https://codeberg.org/xfnw/vulppkgs/archive/27d8596bfd2a068271044b3097329d1d2f80cf4f.tar.gz",
+      "hash": "sha256-xOaZ13ycJ04DoOF5l3YmNhImYR/vmwlnorRDfXBFEMI="
+    }
+  },
+  "version": 8
+}
