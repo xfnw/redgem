@@ -28,6 +28,7 @@ let
       zip -J files.zip
       cat ${self}/bin/redgem files.zip > $out
       zip -A $out
+      chmod +x $out
     '';
 
     meta.mainProgram = "redgem";
