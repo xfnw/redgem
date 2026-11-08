@@ -16,7 +16,10 @@ let
       ];
     };
 
-    env.CARGO_PROFILE = profile;
+    env = {
+      CARGO_PROFILE = profile;
+      REDGEM_VERSION_INFO = "nix";
+    };
 
     passthru.withZip = file: runCommand "redgem.zip" {
       nativeBuildInputs = [ zip ];
