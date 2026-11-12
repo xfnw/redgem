@@ -17,8 +17,8 @@
       "type": "Channel",
       "name": "nixpkgs-unstable",
       "artifact": "nixexprs.tar.zst",
-      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1109744.4fe25e12eb9f/nixexprs.tar.zst",
-      "hash": "sha256-4/Yzr1fWTh/zBAR1tR84ZQ1Zhmor8AXwgD4AS7sPn60="
+      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1114617.f6bf1059f025/nixexprs.tar.zst",
+      "hash": "sha256-FdIy8FR+/hjGqfL/JkSS5NdFsmSrtuc8Jy2vZHzRIvA="
     },
     "vulppkgs": {
       "type": "Git",
@@ -30,9 +30,9 @@
       },
       "branch": "main",
       "submodules": false,
-      "revision": "27d8596bfd2a068271044b3097329d1d2f80cf4f",
-      "url": "https://codeberg.org/xfnw/vulppkgs/archive/27d8596bfd2a068271044b3097329d1d2f80cf4f.tar.gz",
-      "hash": "sha256-xOaZ13ycJ04DoOF5l3YmNhImYR/vmwlnorRDfXBFEMI="
+      "revision": "bac36b723489b5e6bb24a67fb49374f074f53b82",
+      "url": "https://codeberg.org/xfnw/vulppkgs/archive/bac36b723489b5e6bb24a67fb49374f074f53b82.tar.gz",
+      "hash": "sha256-velLt18VvxIIXorKxrOPdDuz/oanXDr6RHge01vaXX4="
     }
   },
   "version": 8
