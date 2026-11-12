@@ -18,7 +18,7 @@ let
 
     env = {
       CARGO_PROFILE = profile;
-      REDGEM_VERSION_INFO = "nix";
+      REDGEM_VERSION_INFO = "nix (${placeholder "out"})";
     };
 
     passthru.withZip = file: runCommand "redgem.zip" {
