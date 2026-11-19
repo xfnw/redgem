@@ -2,6 +2,7 @@
 , lib
 , runCommand
 , zip
+, stdenv
 , profile ? "smol"
 }:
 
@@ -26,11 +27,11 @@ let
     } ''
       cp --no-preserve=all ${file} files.zip
       zip -J files.zip
-      cat ${self}/bin/redgem files.zip > $out
+      cat ${lib.getExe self} files.zip > $out
       zip -A $out
       chmod +x $out
     '';
 
-    meta.mainProgram = "redgem";
+    meta.mainProgram = "redgem${stdenv.targetPlatform.extensions.executable}";
   };
 in self
